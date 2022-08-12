@@ -33,13 +33,14 @@ requires as input:
 11. **threshold_fold_change** Numeric value. Above **threshold** the fold change between genes is computed. Below **threshold** the difference between genes is computed.
 12. **fold_change** Numeric value. For a given gene, the fold change between all the other genes is computed. If fold change is above \emph{fold_change}, then there is a link with weight 1 between the two genes.
 13. **marker_stages** Second element of the list given as output by the function **select_top_markers**
-14. **selected_stages** In vivo stages for which the markers where computed with the function **select_top_markers**
+14. **selected_stages** In vivo stages for which the markers are computed with the function **select_top_markers**
 
 The mean expression profile of **marker_stages_filter** genes is computed for each cluster in the in vivo and in vitro dataset.
 For a given cluster, a connectivity matrix is computed with number of rows and number of columns equal to the length of **marker_stages_filter**. Each entry (i,j)  in the matrix can be 1 if the fold_change between gene i and gene j is above **fold_change**. Otherwise is 0.
 Finally the connectivity matrix of a given **name_vivo** stage and all the clusters in the in vitro dataset are compared.
 A gene i is considered to be conserved between **name_vivo** and an in vitro cluster if the jaccard index of the links of gene i is above **threshold**.
 
+## Example 
 Below an example of input using the development version of **SCOPRO** from GitHub
 
 ```r
