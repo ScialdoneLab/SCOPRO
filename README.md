@@ -97,7 +97,7 @@ marker_all <- marker_result[[1]]
 marker_stages <- marker_result[[2]]
 ```
 
-Run SCOPRO
+### Run SCOPRO
 
 We run SCOPRO between the cluster of the mouse ESCs dataset and the in vivo stage "Late 2-cells".
 
