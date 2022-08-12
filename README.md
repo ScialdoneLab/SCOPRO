@@ -114,8 +114,10 @@ This result is expected since cluster 2 is made up by 2CLC, a rare population of
 marker_stages_filter <- filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
 
 analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, relevant_stages)
-```
 
+plot_score(analysis_2cell, marker_stages, marker_stages_filter, relevant_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
+```
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/main/figures/SCOPRO_1.png" width="700" height="500">
 
 
 ### Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
@@ -138,8 +140,8 @@ rabbit_plot
 
 
 ```
-<img src="https://github.com/ScialdoneLab/CIARA/blob/main/figures/entropy_new_new1.png" width="700" height="500">
-<img src="https://github.com/ScialdoneLab/CIARA/blob/main/figures/entropy_new_new_2.png" width="700" height="500">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/main/figures/SCOPRO_2.png" width="700" height="500">
+
 
 ## Vignette
 
