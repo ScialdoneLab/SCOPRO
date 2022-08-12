@@ -117,7 +117,7 @@ analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_
 
 plot_score(analysis_2cell, marker_stages, marker_stages_filter, relevant_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
 ```
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/main/figures/SCOPRO_1.png" width="700" height="500">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/main/figures/SCOPRO_1.png" width="500" height="300">
 
 
 ### Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
