@@ -1,0 +1,24 @@
+Package: SCOPRO
+Type: Package
+Title: Assign a score projection between a given in vivo stage and each single cluster from an in vitro dataset
+Version: 0.1.0
+Author: Gabriele Lubatti
+Maintainer: Gabriele Lubatti <gabriele.lubatti@helmholtz-muenchen.de>
+Description: R package that assigns a score projection from 0 to 1 between a given in vivo stage and each single cluster from an in vitro dataset. The score is assigned based on the the fraction of specific markers of the in vivo stage that are conserved in the in vitro clusters.
+License:  GPL-3
+Depends:
+    R (>= 4.0)
+Imports:
+    ggplot2
+Suggests:
+    CIARA,
+    rmarkdown,
+    testthat,
+    knitr
+VignetteBuilder: 
+    knitr
+biocViews: software
+BugReports: https://github.com/ScialdoneLab/SCOPRO/issues
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.1
