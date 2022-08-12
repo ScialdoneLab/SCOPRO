@@ -141,4 +141,22 @@ rabbit_plot
 <img src="https://github.com/ScialdoneLab/CIARA/blob/main/figures/entropy_new_new1.png" width="700" height="500">
 <img src="https://github.com/ScialdoneLab/CIARA/blob/main/figures/entropy_new_new_2.png" width="700" height="500">
 
+## Vignette
+
+The following vignette is available and completely reproducible. 
+In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
+It can be accessed within R with:
+```r
+utils::vignette("SCOPRO_vignette")
+```
+
+
+
+
+## Contributions and Support
+Contributions in the form of feedback, comments, code and bug report are welcome.
+* For any contributions, feel free to fork the source code and [submit a pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork).
+* Please report any issues or bugs here: https://github.com/ScialdoneLab/SCOPRO/issues.
+Any questions and requests for support can also be directed to the package maintainer (gabriele[dot]lubatti[at]helmholtz-muenchen[dot]de).
+
 
