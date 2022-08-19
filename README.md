@@ -6,7 +6,7 @@ SCOPRO (SCOre PROjection) is an R package that assigns a score projection from 0
 You can install the development version from [GitHub](https://github.com/) with:
 
 ```r
-devtools::install_github("ScialdoneLab/SCOPRO",auth_token="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",ref="master")
+devtools::install_github("ScialdoneLab/SCOPRO")
 ```
 
 ## Getting started 
