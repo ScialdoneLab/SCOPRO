@@ -142,6 +142,33 @@ rabbit_plot
 ```
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="500" height="500">
 
+## Comparison with projection based on Seurat
+
+SCOPRO assigns an absolute score. Commonly used methods for projection generally give as output a relative score normalized to one. This is the case for the projection based on seurat functions FindTransferAnchors and TransferData. Seurat projection is implemented in the function **findCellTypesSeurat**.
+The limit of giving a relative score is that in vitro cells will always be assign to an in vivo stage, even if they are not transcriptionally similar.
+If the late 2 cells stage is present, then both Seurat and SCOPRO are able to correctly assign cluster 2 to the late 2 cells stage.
+Below the result from Seurat projection is shown. The result from SCOPRO is shown in the previous section **Example**
+```r
+selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+cluster_mouse_rename_small=revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+```
+
+```r
+predictions <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels <- cluster_mouse_rename_small, k.weight = 20)
+assign("mayra_seurat_0", AddMetaData(object = mayra_seurat_0, metadata = predictions))
+cluster_vitro_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell", "epi_4.5", "epi_5.5", "epi_6.5"))
+cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0, cluster_vitro_factor,  main = "Projection Mouse ESC on mouse embryos " ,0.7, 0.4, 0.1)
+ 
+```
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="300" height="300">
+
+If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign cluster 2 to epiblast 4.5 and epiblast 5.5, although this cluster shares just a few markers with these in vivo stages.
+On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="300" height="300">
 
 ## Vignette
 
