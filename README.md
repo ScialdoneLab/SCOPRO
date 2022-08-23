@@ -162,11 +162,15 @@ cluster_vitro_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell",
 cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0, cluster_vitro_factor,  main = "Projection Mouse ESC on mouse embryos " ,0.7, 0.4, 0.1)
  
 ```
+
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
+
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
 
 If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign cluster 2 to epiblast 4.5 and epiblast 5.5, although this cluster shares just a few markers with these in vivo stages.
 On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
+
+
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
