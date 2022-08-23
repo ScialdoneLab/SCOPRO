@@ -1,3 +1,9 @@
+<!-- badges: start -->
+[![](https://www.r-pkg.org/badges/version/SCOPRO)](https://cran.r-project.org/package=SCOPRO)
+[![](http://cranlogs.r-pkg.org/badges/grand-total/SCOPRO?color=green)](https://cran.r-project.org/package=SCOPRO)
+[![](http://cranlogs.r-pkg.org/badges/SCOPRO?color=green)](https://cran.r-project.org/package=SCOPRO)
+[![](http://cranlogs.r-pkg.org/badges/last-day/SCOPRO?color=green)](https://cran.r-project.org/package=SCOPRO)
+
 # SCOPRO
 SCOPRO (SCOre PROjection) is an R package that assigns a score projection from 0 to 1 between a given in vivo stage and each single cluster from an in vitro dataset. The score is assigned based on the the fraction of specific markers of the in vivo stage that are conserved in the in vitro clusters.
 
@@ -179,7 +185,7 @@ On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both e
 ## Vignette
 
 The following vignette is available and completely reproducible. 
-In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
+In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbide et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
 It can be accessed within R with:
 ```r
 utils::vignette("SCOPRO_vignette")
