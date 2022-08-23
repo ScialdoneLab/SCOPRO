@@ -30,7 +30,7 @@ select_top_markers(
 A list with two elements:
 
 \item{marker_all}{Vector with the union of all the \emph{top_number} markers for each stage in \emph{selected_stages}}
-\item{marker_stages}{List with length equal to number of stages in \emph{selected_stages} . Each element contains the \emph{top_number} markers for a given strage in \emph{selected_stages}  }
+\item{marker_stages}{List with length equal to number of stages in \emph{selected_stages} . Each element contains the \emph{top_number} markers for a given stage in \emph{selected_stages}  }
 }
 \description{
 For each stage in \emph{selected_stages}, starting from the markers given by \emph{markers_cluster_seurat} function of the package CIARA, only the markers

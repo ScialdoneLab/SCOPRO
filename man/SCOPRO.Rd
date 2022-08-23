@@ -59,6 +59,25 @@ For a given cluster, a connectivity matrix is computed with number of rows and n
 Finally the connectivity matrix of a given \emph{name_vivo} stage and all the clusters in the in vitro dataset are compared.
 A gene i is considered to be conserved between \emph{name_vivo} and an in vitro cluster if the jaccard index of the links of gene i is above \emph{threshold}.
 }
+\examples{
+load(system.file("extdata", "norm_es_vitro_small.Rda", package = "SCOPRO"))
+n_es= norm_es_vitro_small
+load(system.file("extdata", "norm_vivo_small.Rda", package = "SCOPRO"))
+n_v = norm_vivo_small
+load(system.file("extdata", "cluster_es_vitro_small.Rda", package = "SCOPRO"))
+c_es=cluster_es_vitro_small
+load(system.file("extdata", "cluster_vivo_small.Rda", package = "SCOPRO"))
+c_v=cluster_vivo_small
+load(system.file("extdata", "marker_stages_filter.Rda", package = "SCOPRO"))
+m_s_f = marker_stages_filter
+load(system.file("extdata", "marker_stages.Rda", package = "SCOPRO"))
+m_s = marker_stages
+stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+output_SCOPRO = SCOPRO(n_es,n_v,c_es,c_v,"Late_2_cell",m_s_f,0.1,1,3,0.1,m_s,stages)
+plot_score(output_SCOPRO,m_s,m_s_f,stages,"Late_2_cell","Score","Cluster","2-cells")
+
+
+}
 \author{
 Gabriele Lubatti \email{gabriele.lubatti@helmholtz-muenchen.de}
 }

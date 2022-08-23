@@ -37,7 +37,7 @@ plot_score_genes(
 
 \item{max_size}{Numeric value, specifying the size of the dot.}
 
-\item{text_size}{Numeric value, specifyng the size of the text in the plot.}
+\item{text_size}{Numeric value, specifying the size of the text in the plot.}
 
 \item{title_name}{Character value.}
 }
