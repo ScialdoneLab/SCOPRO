@@ -163,13 +163,13 @@ cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0, cluster_vitro_factor,
  
 ```
 
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_1.png" width="300" height="300">     <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_yes_late2.png.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_1.png" width="300" height="300">     <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_yes_late2.png" width="300" height="300">
 
 If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign cluster 2 to epiblast 4.5 and epiblast 5.5, although this cluster shares just a few markers with these in vivo stages.
 On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
 
 
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_no_late2.png.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_4_5.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_5_5.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_no_late2.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_4_5.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_5_5.png" width="300" height="300">
 
 ## Vignette
 
