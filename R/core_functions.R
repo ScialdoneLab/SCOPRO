@@ -26,13 +26,48 @@
 #' \item{link_no_kept}{List with the names of the genes not conserved between \emph{name_vivo} and each single cluster in the vitro dataset}
 #' \item{final_score}{Numeric value, given by the fraction of conserved markers of \emph{name_vivo} and each single cluster in the in vitro dataset}
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
-#'
+#' @examples
+#' load(system.file("extdata", "norm_es_vitro_small.Rda", package = "SCOPRO"))
+#' n_es= norm_es_vitro_small
+#' load(system.file("extdata", "norm_vivo_small.Rda", package = "SCOPRO"))
+#' n_v = norm_vivo_small
+#' load(system.file("extdata", "cluster_es_vitro_small.Rda", package = "SCOPRO"))
+#' c_es=cluster_es_vitro_small
+#' load(system.file("extdata", "cluster_vivo_small.Rda", package = "SCOPRO"))
+#' c_v=cluster_vivo_small
+#' load(system.file("extdata", "marker_stages_filter.Rda", package = "SCOPRO"))
+#' m_s_f = marker_stages_filter
+#' load(system.file("extdata", "marker_stages.Rda", package = "SCOPRO"))
+#' m_s = marker_stages
+#' stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+#' output_SCOPRO = SCOPRO(n_es,n_v,c_es,c_v,"Late_2_cell",m_s_f,0.1,1,3,0.1,m_s,stages)
+#' plot_score(output_SCOPRO,m_s,m_s_f,stages,"Late_2_cell","Score","Cluster","2-cells")
 #'
 #'
 #' @export SCOPRO
 #'
 
 SCOPRO <- function(norm_vitro, norm_vivo, cluster_vitro, cluster_vivo, name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1,  marker_stages, selected_stages){
+  if (sum(selected_stages %in% name_vivo) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+
+  }
+
+  if (sum(cluster_vivo %in% name_vivo) == 0) {
+    stop("name_vivo must be one the stages present in the vector cluster_vivo")
+
+  }
+
+  if (sum(selected_stages %in% cluster_vivo) == 0) {
+    stop("name_vivo must be one the stages present in the vector cluster_vivo")
+
+  }
+
+  if (length(marker_stages_filter) == 0) {
+    stop("Vector marker_stages_filter has 0 length. Please provide a non-zero length vector.")
+
+  }
+
   mean_2_cell <- mean_stage(norm_vivo, cluster_vivo, name_vivo, marker_stages_filter)
   connettivity_vivo <- find_connettivity(mean_2_cell, fold_change, threshold_fold_change)
   name_cluster <- levels(factor(cluster_vitro))
@@ -43,13 +78,16 @@ SCOPRO <- function(norm_vitro, norm_vivo, cluster_vitro, cluster_vivo, name_vivo
     mean_cluster <- mean_stage(norm_vitro,cluster_vitro,name_cluster[i], marker_stages_filter)
     connettivity_vitro <- find_connettivity(mean_cluster,fold_change, threshold_fold_change)
     connettivity_vitro <- connettivity_vitro[row.names(connettivity_vivo),colnames(connettivity_vivo)]
-    index_specific <- which(selected_stages%in%name_vivo)
+    index_specific <- which(selected_stages %in% name_vivo)
     marker_specific <- marker_stages[[index_specific]]
     if (length(marker_specific) == 0){
       stop(paste0("There are no markers for the stage: ",name_vivo))
     }
     result_comparison <- comparison_vivo_vitro(connettivity_vivo, connettivity_vitro, threshold,number_link, marker_specific)
     link_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]]==1]
+    if (length(link_kept[[i]]) == 0){
+      warning (paste0("There are not conserved genes between ",name_vivo, " and ",name_cluster[i]))
+    }
     link_no_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]]!=1]
     names(link_kept[[i]]) <- rep(name_cluster[i],length(link_kept[[i]]))
     names(link_no_kept[[i]]) <- rep(name_cluster[i],length(link_no_kept[[i]]))
@@ -57,6 +95,9 @@ SCOPRO <- function(norm_vitro, norm_vivo, cluster_vitro, cluster_vivo, name_vivo
     names(final_score[[i]]) <- name_cluster[i]
   }
   common_link <- Reduce(intersect, link_kept)
+  if (length(common_link) == 0){
+    warning (paste0("There are not conserved genes between all the in vitro cluster and ",name_vivo))
+  }
   no_common_link <- Reduce(intersect, link_no_kept)
   return(list(common_link, no_common_link, link_kept, link_no_kept, final_score))
 }
@@ -117,4 +158,35 @@ comparison_vivo_vitro <- function(connettivity_vivo, connettivity_vitro, thresho
   return(list(frac_1,frac_final,frac_specific))
 }
 
+
+#' findCellTypesSeurat
+#'
+#' @param queryObj Seurat object of the in vitro dataset
+#' @param referenceObj Seurat object of the in vivo dataset
+#' @param k.anchor k.anchor parameter in the function \emph{FindTransferAnchors}
+#' @param k.filter k.filter parameter in the function \emph{FindTransferAnchors}
+#' @param k.weight k.weight parameter in the function \emph{TransferData}
+#' @param namedLabels refdata parameter in the function \emph{FindTransferAnchors}
+#' @return  Seurat object
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#' @description Projection done by functions \emph{FindTransferAnchors} and \emph{TransferData} from package \emph{Seurat}
+#' @export findCellTypesSeurat
+#' @seealso \url{https://CRAN.R-project.org/package=Seurat}
+
+
+
+findCellTypesSeurat <- function(queryObj, referenceObj, k.anchor = 5, k.filter = 200, namedLabels, k.weight = 50){
+
+  if (!(requireNamespace("Seurat", quietly = TRUE))) {
+    stop("Package Seurat needed for this function to work. Please install it: install.packages('Seurat')")
+  }
+
+  anchors <- Seurat::FindTransferAnchors(reference = referenceObj, query = queryObj,k.anchor = k.anchor,k.filter = k.filter)
+  predictions <- Seurat::TransferData(anchorset = anchors, refdata = namedLabels, k.weight = k.weight)
+  queryObj <- Seurat::AddMetaData(object = queryObj, metadata = predictions)
+
+  return(queryObj)
+}
 

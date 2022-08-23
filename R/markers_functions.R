@@ -12,7 +12,7 @@
 #' @return A list with two elements:
 #'
 #' \item{marker_all}{Vector with the union of all the \emph{top_number} markers for each stage in \emph{selected_stages}}
-#' \item{marker_stages}{List with length equal to number of stages in \emph{selected_stages} . Each element contains the \emph{top_number} markers for a given strage in \emph{selected_stages}  }
+#' \item{marker_stages}{List with length equal to number of stages in \emph{selected_stages} . Each element contains the \emph{top_number} markers for a given stage in \emph{selected_stages}  }
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #' @seealso \url{ https://CRAN.R-project.org/package=CIARA}
 #'
@@ -23,9 +23,18 @@
 
 
 select_top_markers <- function(selected_stages,cluster_vivo, norm_vivo, markers_small, max_number = 100, threshold = 0.1){
+  if (length(markers_small) == 0) {
+    stop("Length of markers_small is zero. Please provide a non-zero length vector.")
+  }
+  if (!all(selected_stages %in% cluster_vivo)) {
+    stop("One or more stages are not present. Please check that all stages in selected_stages are also present in cluster_vivo")
+  }
   marker_stages=rep(list(0),length(selected_stages))
   for (i in 1:length(selected_stages)){
     white_black=white_black_marker(cluster_vivo[cluster_vivo%in%selected_stages],selected_stages[i],norm_vivo[,cluster_vivo%in%selected_stages],markers_small,threshold)
+    if (sum(white_black) == 0){
+      warning(paste0("For stage ",selected_stages[i]," no markers were selected"))
+    }
     marker_stages[[i]] <- names(white_black)[white_black]
     if (sum(white_black) > max_number){
       marker_stages[[i]] <- marker_stages[[i]][1:max_number]
@@ -54,9 +63,21 @@ select_top_markers <- function(selected_stages,cluster_vivo, norm_vivo, markers_
 #'
 
 select_common_genes <- function(SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro){
+  if (sum(selected_stages %in% name_vivo) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+
+  }
+  if (sum(cluster_vitro %in% name_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+
+  }
   index_specific <- which(selected_stages %in% name_vivo)
   marker_specific <- marker_stages[[index_specific]]
   index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+  if (sum(SCOPRO_output[[3]][[index_vitro]] %in% marker_specific) == 0) {
+    warning("There are not conserved genes between the in vivo stage and the in vitro cluster")
+
+  }
   common_genes <- SCOPRO_output[[3]][[index_vitro]][SCOPRO_output[[3]][[index_vitro]] %in% marker_specific]
   return(common_genes)
 }
@@ -80,9 +101,21 @@ select_common_genes <- function(SCOPRO_output, marker_stages, selected_stages, n
 #'
 
 select_no_common_genes <- function(SCOPRO_output,marker_stages,selected_stages,name_vivo,cluster_vitro,name_vitro){
+  if (sum(selected_stages %in% name_vivo) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+
+  }
+  if (sum(cluster_vitro %in% name_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+
+  }
   index_specific <- which(selected_stages%in%name_vivo)
   marker_specific <- marker_stages[[index_specific]]
   index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+  if (sum(SCOPRO_output[[4]][[index_vitro]] %in% marker_specific) == 0) {
+    warning("There aren't non-conserved genes between the in vivo stage and the in vitro cluster")
+
+  }
   no_common_genes <- SCOPRO_output[[4]][[index_vitro]][SCOPRO_output[[4]][[index_vitro]] %in% marker_specific]
   return(no_common_genes)
 }
@@ -132,6 +165,9 @@ white_black_marker <- function(cluster_vivo, name_vivo, norm_vivo, marker_list, 
 #'
 #'
 filter_in_vitro <- function(norm_vitro, cluster_vitro, marker_all, fraction = 0.10, threshold  = 0){
+  if (length(marker_all) < 2) {
+    stop("Vector marker_all must be at least of length 2")
+  }
   livelli <- levels(factor(cluster_vitro))
   result_livelli <- rep(list(0),length(livelli))
   for ( i in 1:length(livelli)){

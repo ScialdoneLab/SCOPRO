@@ -8,7 +8,7 @@
 #' @param label_2 Character value. Label for the in vivo dataset
 #' @param final_name Character vector with the names of the genes to show in the plot.
 #' @param max_size Numeric value, specifying the size of the dot.
-#' @param text_size Numeric value, specifyng the size of the text in the plot.
+#' @param text_size Numeric value, specifying the size of the text in the plot.
 #' @param title_name Character value.
 
 #' @return ggplot2::ggplot2 object showing balloon plot.
@@ -122,3 +122,114 @@ plot_balons <- function(norm_counts, final_cluster, genes_to_plot, max_number, t
   p <- ggplot2::ggplot(balloon_melted, ggplot2::aes(x =factor(cluster_label_all,levels=unique(cluster_label_all)), y = factor(balloon_melted[,4],levels=(unique(label_final)))))
   p + ggplot2::geom_point( ggplot2::aes(size=values,colour=as.numeric(all_markers_values))) + ggplot2::theme(panel.background=ggplot2::element_blank(), panel.border = ggplot2::element_rect(colour = "blue", fill=NA, size=3))+ggplot2::scale_size_area(max_size=max_size)+ ggplot2::scale_colour_gradient(low = "grey", high = "brown", na.value = NA)+ggplot2::labs(colour="Mean",size="Value")+ggplot2::xlab("Cluster")+ggplot2::ylab("Markers")+ggplot2::theme(text = ggplot2::element_text(size=text_size),axis.text.x = ggplot2::element_text(angle=45,vjust=1,hjust=1),axis.title.x=ggplot2::element_blank())
 }
+
+
+#' cellTypesPerClusterBalloonPlot
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams  select_common_genes
+#' @inheritParams plot_score_genes
+#' @description All the stages in \emph{cluster_vivo_factor} are showns in the balloon plot
+#' @param obj Seurat object given as output from function \emph{findCellTypesSeurat}
+#' @param cluster_vivo_factor Factor vector specifyng the cluster partition of the in vivo datataset
+#' @param order_label_vivo Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}
+#' @param label_size Numeric value specifyng the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.
+#' @param thresold Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned
+
+#' @return  balloon plot given by function \emph{balloonplot} from package \emph{gplots}
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#'
+#' @export cellTypesPerClusterBalloonPlot
+#' @seealso \url{https://CRAN.R-project.org/package=gplots}
+
+cellTypesPerClusterBalloonPlot <- function(obj, cluster_vivo_factor, order_label_vivo, title_name, text_size = 0.4, label_size = 0.4, thresold = 0.5) {
+
+  if (!(requireNamespace("gplots", quietly = TRUE))) {
+    stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+  }
+
+  obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+  levels_vitro <- c(levels(cluster_vivo_factor))
+  levels_vitro_factor <- factor(levels_vitro,levels = order_label_vivo)
+
+  if(sum(obj@meta.data$predicted.id == "Unassigned") > 0){
+    levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, "Unassigned"))
+  }
+  cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+
+  clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+
+
+
+  nElements <- numeric()
+  for(cellType in levels(levels_vitro_factor)){
+    nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+  }
+
+
+
+  data<-data.frame(cellTypes, clusters, nElements)
+
+  for(cluster in unique(data$clusters)){
+    data$nElements[which(data$clusters == cluster)] <- 100*data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+  }
+
+  return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size,ylab="", xlab="", main = title_name))
+
+}
+
+
+#' cellTypesPerClusterBalloonPlot_small
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams  select_common_genes
+#' @inheritParams plot_score_genes
+#' @inheritParams cellTypesPerClusterBalloonPlot
+#' @return  balloon plot given by function \emph{balloonplot} from package \emph{gplots}
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are showns in the balloon plot
+#' @export cellTypesPerClusterBalloonPlot_small
+#' @seealso \url{https://CRAN.R-project.org/package=gplots}
+
+
+
+
+cellTypesPerClusterBalloonPlot_small <- function(obj, cluster_vivo_factor, title_name, text_size = 0.4, label_size = 0.7, thresold = 0.5){
+
+  if (!(requireNamespace("gplots", quietly = TRUE))) {
+    stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+  }
+
+  obj@meta.data$predicted.id[obj@meta.data$prediction.score.max<=thresold] <- "Unassigned"
+  cellTypes <- rep(levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predicted.id))], each = length(unique(as.vector(obj$seurat_clusters))))
+
+
+  clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predicted.id))))
+
+  nElements <- numeric()
+
+  for(cellType in levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predicted.id))]){
+    nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+  }
+
+
+
+  data <- data.frame(cellTypes, clusters, nElements)
+
+  for(cluster in unique(data$clusters)){
+    data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+  }
+
+  return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size, ylab="", xlab="", main= title_name))
+
+}
+
+
+
