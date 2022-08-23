@@ -156,8 +156,7 @@ seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mous
 ```
 
 ```r
-predictions <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels <- cluster_mouse_rename_small, k.weight = 20)
-assign("mayra_seurat_0", AddMetaData(object = mayra_seurat_0, metadata = predictions))
+mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels <- cluster_mouse_rename_small, k.weight = 20)
 cluster_vitro_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell", "epi_4.5", "epi_5.5", "epi_6.5"))
 order_label_vitro <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
 cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vitro_factor, order_label_vitro, main = "Projection Mouse ESC on mouse embryos " ,1, 1, 0.1)
