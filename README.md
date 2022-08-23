@@ -61,7 +61,7 @@ destfile <- paste0(current_wd,"/SCOPRO.zip")
 download.file(url, destfile, quiet = FALSE)
 unzip(destfile, exdir=current_wd)
 ```
-Load in vitro dataset (single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w))
+Load in vitro dataset (single cell RNA seq mouse data from [Iturbide et al., 2021](https://www.nature.com/articles/s41594-021-00590-w))
 ```r
 setwd(paste0(current_wd,"/SCOPRO"))
 load(file='mayra_dati_raw_0.Rda')
