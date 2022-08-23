@@ -5,7 +5,7 @@ vignette: >
   %\VignetteIndexEntry{SCOPRO}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-  % \VignetteDepends{Seurat}
+  % \VignetteDepends{CIARA,Seurat,gplots}
 ---
 
 
@@ -18,19 +18,19 @@ knitr::opts_chunk$set(
 )
 ```
 
-The vignette depends on CIARA and Seurat packages.
+The vignette depends on CIARA, Seurat, gplots and plyr packages.
 ```{r setup}
 library(SCOPRO)
-required <- c("CIARA","Seurat")
+required <- c("CIARA","Seurat","gplots","plyr")
 if (!all(unlist(lapply(required, function(pkg) requireNamespace(pkg, quietly = TRUE)))))
   knitr::opts_chunk$set(eval = FALSE)
 ```
 
-In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
+In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://pubmed.ncbi.nlm.nih.gov/24408435/) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
 
 The single cell RNA seq dataset includes 1285 mouse embryonic stem cells, including a small cluster of 2-cell-like cells (2CLC) (cluster 2, 31 cells).  
 
-The in vivo mouse dataset from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) includes stages from from early 2 cells-stage to late blastocyst while the in vivo mouse dataset from [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) includes stages from from E4.5 to E6.5.
+The in vivo mouse dataset from [Deng et al. , 2014](https://pubmed.ncbi.nlm.nih.gov/24408435/) includes stages from from early 2 cells-stage to late blastocyst while the in vivo mouse dataset from [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) includes stages from from E4.5 to E6.5.
 
 ## Load mouse ESCs raw count matrix
 We load the raw count matrix provided in the original paper and create norm counts and run cluster analysis with CIARA function **cluster_analysis_integrate_rare ** 
@@ -59,8 +59,8 @@ cluster_es_vitro=as.vector(mayra_seurat_0$RNA_snn_res.0.1)
 
 ## Load in vivo mouse datasets
 
-The seurat object **seurat_genes_published_mouse.Rda** already includes the raw and normalized count matrix obtained combining the two in vivo datasets ( [Deng et al., 014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) ).
-Normalization was done with Seurat function **NormalizeData** (default paramters).
+The seurat object **seurat_genes_published_mouse.Rda** already includes the raw and normalized count matrix obtained combining the two in vivo datasets ( [Deng et al., 014](https://pubmed.ncbi.nlm.nih.gov/24408435/) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) ).
+Normalization was done with Seurat function **NormalizeData** (default parameters).
 Seurat object can be downloaded [here](https://hmgubox2.helmholtz-muenchen.de/index.php/s/EHQSnjMJxkR7QYT)
 
 ```{r , eval = FALSE}
@@ -141,16 +141,16 @@ analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_
 
 
 
-
+#png("/Users/gabriele.lubatti/Downloads/SCOPRO_1.png")
 plot_score(analysis_2cell, marker_stages, marker_stages_filter, relevant_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
-
+#dev.off()
 
 ```
 
 
 ## Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
 
-We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluter 2.
+We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluster 2.
 As expected the Zscan4 family genes are conserved.
 ```{r,eval = FALSE}
 
@@ -166,10 +166,10 @@ all_genes_label <- c(paste0(no_common_genes[1:4], "-no_conserved"), paste0(commo
 
 
 
-#pdf ("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/10x_data/Figures_paper/score_analysis/score_mouse_esc_late2.pdf",height = 6, width = 9)
+
 
 rabbit_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
-#rabbit_plot[[1]]
+#png("/Users/gabriele.lubatti/Downloads/SCOPRO_2.png")
 rabbit_plot
 #dev.off()
 
@@ -177,6 +177,44 @@ rabbit_plot
 
 
 ```
+
+## Projection with Seurat
+
+Commonly used methods for projection generally give as output a relative score normalized to one. This is the case for the projection based on seurat functions FindTransferAnchors and TransferData. Seurat projection is implemented in the function **findCellTypesSeurat**.
+
+```{r,eval = FALSE}
+selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small=revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+```
+
+```{r,eval = FALSE}
+
+mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+
+
+ 
+ 
+
+ cluster_vitro_factor=factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vitro = c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+ #png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vitro_factor, order_label_vitro,  title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+ #dev.off()
+ 
+ 
+ 
+```
+
 
 ```{r}
 utils::sessionInfo()
