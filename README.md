@@ -171,7 +171,7 @@ If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign 
 On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
 
 
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200"> <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200"> <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">   <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">   <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="200" height="200">
 
 ## Vignette
 
