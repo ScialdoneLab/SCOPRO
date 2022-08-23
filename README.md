@@ -149,9 +149,9 @@ The limit of giving a relative score is that in vitro cells will always be assig
 If the late 2 cells stage is present, then both Seurat and SCOPRO are able to correctly assign cluster 2 to the late 2 cells stage.
 Below the result from Seurat projection is shown. The result from SCOPRO is shown in the previous section **Example**
 ```r
-selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
-cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
-cluster_mouse_rename_small=revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+selected_stages <- c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+cluster_mouse_published_small <- cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+cluster_mouse_rename_small <- revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
 seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
 ```
 
