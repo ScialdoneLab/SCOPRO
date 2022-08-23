@@ -2,8 +2,13 @@
 SCOPRO (SCOre PROjection) is an R package that assigns a score projection from 0 to 1 between a given in vivo stage and each single cluster from an in vitro dataset. The score is assigned based on the the fraction of specific markers of the in vivo stage that are conserved in the in vitro clusters.
 
 ## Installation
+You can install the released version of CIARA from [CRAN](https://CRAN.R-project.org) with:
 
-You can install the development version from [GitHub](https://github.com/) with:
+```r
+install.packages("SCOPRO")
+```
+
+And the development version from [GitHub](https://github.com/) with:
 
 ```r
 devtools::install_github("ScialdoneLab/SCOPRO")
