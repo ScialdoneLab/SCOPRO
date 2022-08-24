@@ -155,8 +155,8 @@ all_genes <- c(no_common_genes[1:4], common_genes[1:10])
 all_genes_label <- c(paste0(no_common_genes[1:4], "-no_conserved"), paste0(common_genes[1:10], "-conserved"))
 
 
-rabbit_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
-rabbit_plot
+mouse_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
+mouse_plot
 
 
 ```
