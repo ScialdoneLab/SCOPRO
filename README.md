@@ -65,9 +65,10 @@ Load in vitro dataset (single cell RNA seq mouse data from [Iturbide et al., 202
 ```r
 setwd(paste0(current_wd,"/SCOPRO"))
 load(file='mayra_dati_raw_0.Rda')
-mayra_seurat_0=cluster_analysis_integrate_rare(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
-norm_es_vitro=as.matrix(GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
-cluster_es_vitro=as.vector(mayra_seurat_0$RNA_snn_res.0.1)
+mayra_seurat_0 <- create_seurat_object(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
+
+norm_es_vitro <- as.matrix(Seurat::GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
+cluster_es_vitro <- as.vector(mayra_seurat_0$RNA_snn_res.0.1)
 ```
 
 Load in vivo mouse dataset (bulk RNA seq data from [Deng et al. , 2014](https://www.science.org/doi/10.1126/science.1245316) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610))
@@ -81,15 +82,23 @@ norm_vivo <- as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "data",
 
 Compute markers for selected in vivo stages using CIARA function **markers_cluster_seurat** based on package Seurat
 ```r
-DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+Seurat::DefaultAssay(seurat_genes_published_mouse) <- "RNA"
 cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
 
 
-relevant_stages <- c("Late_2_cell", "epiblast_4.5", "epiblast_5.5", "epiblast_6.5")
+selected_stages <- c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
 
-DefaultAssay(seurat_genes_published_mouse) <- "RNA"
 
-markers_first_ESC_small <- CIARA::markers_cluster_seurat(seurat_genes_published_mouse[,cluster_mouse_published%in%relevant_stages],cluster_mouse_published[cluster_mouse_published%in%relevant_stages],names(seurat_genes_published_mouse$RNA_snn_res.0.2)[cluster_mouse_published%in%relevant_stages],10)
+cluster_mouse_published_small <- cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small <- seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+norm_vivo_small <- as.matrix(Seurat::GetAssayData(seurat_genes_published_mouse_small, slot = "data",assay="RNA"))
+
+markers_first_ESC_small <- markers_cluster_seurat(seurat_genes_published_mouse_small,cluster_mouse_published_small,names(seurat_genes_published_mouse_small$RNA_snn_res.0.2),10)
 
 markers_mouse <- as.vector(markers_first_ESC_small[[3]])
 stages_markers <- names(markers_first_ESC_small[[3]])
@@ -160,17 +169,16 @@ The limit of giving a relative score is that in vitro cells will always be assig
 If the late 2 cells stage is present, then both Seurat and SCOPRO are able to correctly assign cluster 2 to the late 2 cells stage.
 Below the result from Seurat projection is shown. The result from SCOPRO is shown in the previous section **Example**
 ```r
-selected_stages <- c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
-cluster_mouse_published_small <- cluster_mouse_published[cluster_mouse_published %in% selected_stages]
-cluster_mouse_rename_small <- revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
-seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
 ```
 
 ```r
-mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels <- cluster_mouse_rename_small, k.weight = 20)
-cluster_vitro_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell", "epi_4.5", "epi_5.5", "epi_6.5"))
-order_label_vitro <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
-cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vitro_factor, order_label_vitro, main = "Projection Mouse ESC on mouse embryos " ,1, 1, 0.1)
+mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+cluster_vivo_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vivo <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vivo_factor, order_label_vivo,  title_name  = "Projection Mouse ESC on mouse embryos ", method = "Seurat" ,1,1,0.1)
  
 ```
 
