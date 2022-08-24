@@ -52,7 +52,7 @@ Finally the connectivity matrix of a given **name_vivo** stage and all the clust
 A gene i is considered to be conserved between **name_vivo** and an in vitro cluster if the jaccard index of the links of gene i is above **threshold**.
 
 ## Example 
-Below an example of input using the development version of **SCOPRO** from GitHub
+Below an example of input using the development version of **SCOPRO** from GitHub.
 
 ```r
 current_wd <- getwd()
