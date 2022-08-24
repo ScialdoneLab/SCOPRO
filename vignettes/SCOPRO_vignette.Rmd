@@ -5,7 +5,7 @@ vignette: >
   %\VignetteIndexEntry{SCOPRO}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-  % \VignetteDepends{CIARA,Seurat,gplots}
+  % \VignetteDepends{Seurat,gplots,plyr}
 ---
 
 
@@ -18,13 +18,17 @@ knitr::opts_chunk$set(
 )
 ```
 
-The vignette depends on CIARA, Seurat, gplots and plyr packages.
-```{r setup}
-library(SCOPRO)
-required <- c("CIARA","Seurat","gplots","plyr")
-if (!all(unlist(lapply(required, function(pkg) requireNamespace(pkg, quietly = TRUE)))))
+The vignette depends on Seurat, gplots and plyr packages.
+```{r, eval = FALSE}
+required <- c("Seurat","gplots","plyr")
+if (sum(!all(unlist(lapply(required, function(pkg) requireNamespace(pkg, quietly = TRUE)))))>0)
   knitr::opts_chunk$set(eval = FALSE)
 ```
+
+```{r}
+library(SCOPRO)
+```
+
 
 In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://pubmed.ncbi.nlm.nih.gov/24408435/) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
 
@@ -49,9 +53,10 @@ unzip(destfile, exdir=current_wd)
 ```{r, eval = FALSE }
 setwd(paste0(current_wd,"/SCOPRO"))
 load(file='mayra_dati_raw_0.Rda')
-mayra_seurat_0=cluster_analysis_integrate_rare(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
-norm_es_vitro=as.matrix(GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
-cluster_es_vitro=as.vector(mayra_seurat_0$RNA_snn_res.0.1)
+mayra_seurat_0 <- create_seurat_object(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
+
+norm_es_vitro <- as.matrix(Seurat::GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
+cluster_es_vitro <- as.vector(mayra_seurat_0$RNA_snn_res.0.1)
 ```
 
 
@@ -67,7 +72,7 @@ Seurat object can be downloaded [here](https://hmgubox2.helmholtz-muenchen.de/in
 setwd(paste0(current_wd,"/SCOPRO"))
 load(file="seurat_genes_published_mouse.Rda")
 
-norm_vivo <- as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "data",assay="RNA"))
+norm_vivo <- as.matrix(Seurat::GetAssayData(seurat_genes_published_mouse, slot = "data",assay="RNA"))
 
 ```
 
@@ -76,20 +81,29 @@ norm_vivo <- as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "data",
 
 ## Compute markers for selected in vivo stages 
 
+
 ```{r, eval = FALSE}
-
-
-DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+Seurat::DefaultAssay(seurat_genes_published_mouse) <- "RNA"
 cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
 
 
-relevant_stages <- c("Late_2_cell", "epiblast_4.5", "epiblast_5.5", "epiblast_6.5")
+selected_stages <- c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
 
-DefaultAssay(seurat_genes_published_mouse) <- "RNA"
 
-markers_first_ESC_small <- CIARA::markers_cluster_seurat(seurat_genes_published_mouse[,cluster_mouse_published%in%relevant_stages],cluster_mouse_published[cluster_mouse_published%in%relevant_stages],names(seurat_genes_published_mouse$RNA_snn_res.0.2)[cluster_mouse_published%in%relevant_stages],10)
+cluster_mouse_published_small <- cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small <- seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+norm_vivo_small <- as.matrix(Seurat::GetAssayData(seurat_genes_published_mouse_small, slot = "data",assay="RNA"))
+
+markers_first_ESC_small <- markers_cluster_seurat(seurat_genes_published_mouse_small,cluster_mouse_published_small,names(seurat_genes_published_mouse_small$RNA_snn_res.0.2),10)
 
 ```
+
+
 
 
 ```{r,eval = FALSE }
@@ -112,7 +126,7 @@ For each in vivo stage, we select only the markers for which the median is above
 ```{r ,eval = FALSE}
 
 
-marker_result <- select_top_markers(relevant_stages, cluster_mouse_published, norm_vivo, markers_small, max_number = 100, threshold = 0.1)
+marker_result <- select_top_markers(selected_stages, cluster_mouse_published_small, norm_vivo_small, markers_small, max_number = 100, threshold = 0.1)
 marker_all <- marker_result[[1]]
 marker_stages <- marker_result[[2]]
 
@@ -137,13 +151,11 @@ This result is expected since cluster 2 is made up by 2CLC, a rare population of
 
 marker_stages_filter <- filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
 
-analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, relevant_stages)
+analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo_small,cluster_es_vitro,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, selected_stages)
 
 
+plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
 
-#png("/Users/gabriele.lubatti/Downloads/SCOPRO_1.png")
-plot_score(analysis_2cell, marker_stages, marker_stages_filter, relevant_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
-#dev.off()
 
 ```
 
@@ -155,8 +167,8 @@ As expected the Zscan4 family genes are conserved.
 ```{r,eval = FALSE}
 
 
-common_genes <- select_common_genes(analysis_2cell, marker_stages, relevant_stages, "Late_2_cell", cluster_es_vitro, "2")
-no_common_genes <- select_no_common_genes(analysis_2cell, marker_stages, relevant_stages, "Late_2_cell", cluster_es_vitro, "2")
+common_genes <- select_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
+no_common_genes <- select_no_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
 
 
 
@@ -168,10 +180,10 @@ all_genes_label <- c(paste0(no_common_genes[1:4], "-no_conserved"), paste0(commo
 
 
 
-rabbit_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
-#png("/Users/gabriele.lubatti/Downloads/SCOPRO_2.png")
-rabbit_plot
-#dev.off()
+mouse_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo_small[ , cluster_mouse_published_small=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published_small[cluster_mouse_published_small == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
+
+mouse_plot
+
 
 
 
@@ -180,18 +192,13 @@ rabbit_plot
 
 ## Projection with Seurat
 
-Commonly used methods for projection generally give as output a relative score normalized to one. This is the case for the projection based on seurat functions FindTransferAnchors and TransferData. Seurat projection is implemented in the function **findCellTypesSeurat**.
+Commonly used methods for projection (Seurat) generally give as output a relative score normalized to one or just the predicted label (scibetR, scmap). This is the case for the projection based on seurat functions FindTransferAnchors and TransferData. Seurat projection is implemented in the function **findCellTypesSeurat**.
+The implementation of [scibetR](https://github.com/zwj-tina/scibetR) and [scmap](https://bioconductor.org/packages/release/bioc/html/scmap.html) is also available in SCOPRO with the functions **findCellTypes_scmap** and **findCellTypesScibet**
+
 
 ```{r,eval = FALSE}
-selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
 
-
-cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
-
-cluster_mouse_rename_small=revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
-
-
-seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
 
 ```
 
@@ -203,15 +210,12 @@ mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = 
  
  
 
- cluster_vitro_factor=factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+ cluster_vivo_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
 
-order_label_vitro = c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+order_label_vivo <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
 
- #png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
- cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vitro_factor, order_label_vitro,  title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
- #dev.off()
  
- 
+cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vivo_factor, order_label_vivo,  title_name  = "Projection Mouse ESC on mouse embryos ", method = "Seurat" ,1,1,0.1)
  
 ```
 
