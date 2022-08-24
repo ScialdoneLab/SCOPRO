@@ -7,7 +7,9 @@
 cellTypesPerClusterBalloonPlot_small(
   obj,
   cluster_vivo_factor,
+  order_label_vivo,
   title_name,
+  method = "Seurat",
   text_size = 0.4,
   label_size = 0.7,
   thresold = 0.5
@@ -18,13 +20,17 @@ cellTypesPerClusterBalloonPlot_small(
 
 \item{cluster_vivo_factor}{Factor vector specifyng the cluster partition of the in vivo datataset}
 
+\item{order_label_vivo}{Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}}
+
 \item{title_name}{Character value.}
+
+\item{method}{Character name. Must be one of Seurat, scibetR or scmap}
 
 \item{text_size}{Numeric value, specifying the size of the text in the plot.}
 
 \item{label_size}{Numeric value specifyng the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.}
 
-\item{thresold}{Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned}
+\item{thresold}{Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned. Only used when \emph{method} is Seurat}
 }
 \value{
 balloon plot given by function \emph{balloonplot} from package \emph{gplots}

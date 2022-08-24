@@ -76,6 +76,45 @@ plot_score <- function(SCOPRO_output, marker_stages, marker_stages_filter, selec
              axis.title.x = ggplot2::element_blank()) + ggplot2::ylab(y_name) + ggplot2::labs(fill=fill_name) +  ggplot2::ylim(c(0,1)) + ggplot2::ggtitle(paste0(title_name," (",sum(marker_stages_filter %in% marker_specific)," genes)",sep=" "))
 }
 
+
+#' plot_score_sc
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams  select_common_genes
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_score
+#' @param SCOPRO_output output given by function \emph{SCOPRO_single_cell}
+
+#' @return ggplot2::ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#'
+#' @export plot_score_sc
+#'
+
+plot_score_sc <- function (SCOPRO_output, cluster_vitro, marker_stages, marker_stages_filter, selected_stages, name_vivo, y_name, fill_name, title_name)
+{
+  final_score <- c(as.vector(unlist(SCOPRO_output[[5]])))
+  label <- cluster_vitro
+  df <- data.frame(final_score, label)
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = label, y = final_score,
+                                        fill = label)) + ggplot2::geom_boxplot()+ggplot2::geom_jitter(position=ggplot2::position_jitter(0.2)) +
+    ggplot2::theme_minimal()
+  p + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45,
+                                                         vjust = 1, hjust = 1), axis.title.x = ggplot2::element_blank()) +
+    ggplot2::ylab(y_name) + ggplot2::labs(fill = fill_name) +
+    ggplot2::ylim(c(-0.1, 1)) + ggplot2::ggtitle(paste0(title_name,
+                                                        " (", sum(marker_stages_filter %in% marker_specific),
+                                                        " genes)", sep = " "))
+}
+
+
+
+
 #' plot_balons
 #' @noRd
 #'
@@ -135,7 +174,8 @@ plot_balons <- function(norm_counts, final_cluster, genes_to_plot, max_number, t
 #' @param cluster_vivo_factor Factor vector specifyng the cluster partition of the in vivo datataset
 #' @param order_label_vivo Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}
 #' @param label_size Numeric value specifyng the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.
-#' @param thresold Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned
+#' @param thresold Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned. Only used when \emph{method} is Seurat
+#' @param method Character name. Must be one of Seurat, scibetR or scmap
 
 #' @return  balloon plot given by function \emph{balloonplot} from package \emph{gplots}
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
@@ -145,42 +185,85 @@ plot_balons <- function(norm_counts, final_cluster, genes_to_plot, max_number, t
 #' @export cellTypesPerClusterBalloonPlot
 #' @seealso \url{https://CRAN.R-project.org/package=gplots}
 
-cellTypesPerClusterBalloonPlot <- function(obj, cluster_vivo_factor, order_label_vivo, title_name, text_size = 0.4, label_size = 0.4, thresold = 0.5) {
-
+cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_label_vivo, method = "Seurat", title_name, text_size = 0.4, label_size = 0.4, thresold = 0.5)
+{if (method == "Seurat"){
   if (!(requireNamespace("gplots", quietly = TRUE))) {
     stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
   }
-
-  obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+  obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <=
+                               thresold] <- "Unassigned"
   levels_vitro <- c(levels(cluster_vivo_factor))
-  levels_vitro_factor <- factor(levels_vitro,levels = order_label_vivo)
-
-  if(sum(obj@meta.data$predicted.id == "Unassigned") > 0){
+  levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+  if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
     levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
-    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, "Unassigned"))
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo,
+                                                           "Unassigned"))
   }
   cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
-
   clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
-
-
-
   nElements <- numeric()
-  for(cellType in levels(levels_vitro_factor)){
+  for (cellType in levels(levels_vitro_factor)) {
     nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
   }
+  data <- data.frame(cellTypes, clusters, nElements)
+  for (cluster in unique(data$clusters)) {
+    data$nElements[which(data$clusters == cluster)] <- 100 *
+      data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+  }
+  return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size,
+                             ylab = "", xlab = "", main = title_name))
+}
+  if (method == "scibetR"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 *
+        data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters ==  cluster)])}
+    return(gplots::balloonplot(data$cellTypes, data$clusters,
+                               data$nElements, label.size = label_size, text.size = text_size,
+                               ylab = "", xlab = "", main = title_name))
+  }
+  if (method == "scmap"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo,
+                                                           "unassigned"))
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 *
+        data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters,
+                               data$nElements, label.size = label_size, text.size = text_size,
+                               ylab = "", xlab = "", main = title_name))
 
-
-
-  data<-data.frame(cellTypes, clusters, nElements)
-
-  for(cluster in unique(data$clusters)){
-    data$nElements[which(data$clusters == cluster)] <- 100*data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+  }
+  if (method != "Seurat" & method != "scibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, ScibetR or scmap.")
   }
 
-  return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size,ylab="", xlab="", main = title_name))
-
 }
+
+
+
 
 
 #' cellTypesPerClusterBalloonPlot_small
@@ -201,35 +284,109 @@ cellTypesPerClusterBalloonPlot <- function(obj, cluster_vivo_factor, order_label
 
 
 
-cellTypesPerClusterBalloonPlot_small <- function(obj, cluster_vivo_factor, title_name, text_size = 0.4, label_size = 0.7, thresold = 0.5){
-
-  if (!(requireNamespace("gplots", quietly = TRUE))) {
-    stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+cellTypesPerClusterBalloonPlot_small <- function (obj, cluster_vivo_factor, order_label_vivo, title_name, method = "Seurat",text_size = 0.4,
+                                                  label_size = 0.7, thresold = 0.5)
+{
+  if (method == "Seurat"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo))
+    if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
+      levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+      levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo,"Unassigned"))
+    }
+    cellTypes <- rep(levels_vitro[levels_vitro %in% unique(as.vector(obj@meta.data$predicted.id))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predicted.id))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in%
+                                  unique(as.vector(obj@meta.data$predicted.id))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size,
+                               ylab = "", xlab = "", main = title_name))
   }
-
-  obj@meta.data$predicted.id[obj@meta.data$prediction.score.max<=thresold] <- "Unassigned"
-  cellTypes <- rep(levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predicted.id))], each = length(unique(as.vector(obj$seurat_clusters))))
-
-
-  clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predicted.id))))
-
-  nElements <- numeric()
-
-  for(cellType in levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predicted.id))]){
-    nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+  if (method == "scibetR"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    cellTypes <- rep(levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predictions))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+    }
+    print(data)
+    return(gplots::balloonplot(data$cellTypes, data$clusters,
+                               data$nElements, label.size = label_size, text.size = text_size,
+                               ylab = "", xlab = "", main = title_name))
   }
-
-
-
-  data <- data.frame(cellTypes, clusters, nElements)
-
-  for(cluster in unique(data$clusters)){
-    data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+  if (method == "scmap"){
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels =  c(order_label_vivo,"unassigned"))
+    cellTypes <- rep(levels_vitro[levels_vitro %in%
+                                    unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in% unique(as.vector(obj@meta.data$predictions))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 *
+        data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters ==
+                                                                                   cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters,
+                               data$nElements, label.size = label_size, text.size = text_size,
+                               ylab = "", xlab = "", main = title_name))
   }
-
-  return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size, ylab="", xlab="", main= title_name))
-
+  if (method != "Seurat" & method != "scibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, scibetR or scmap")
+  }
 }
+
+
+
+#' plot_boxplot
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams select_common_genes
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_score
+#' @inheritParams cellTypesPerClusterBalloonPlot
+#' @param norm_vivo Norm count matrix (n_genes X n_cells)
+#' @param cluster_vivo cluster partition
+#' @param gene_name Character name of the gene of interest
+#' @param x_name Character name of x axis.
+#' @return  ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are showns in the balloon plot
+#' @export plot_boxplot
+#' @seealso \url{https://CRAN.R-project.org/package=gplots}
+
+
+plot_boxplot <- function(norm_vivo, gene_name, cluster_vivo, order_label_vivo, title_name, fill_name, x_name, y_name){
+  gene_expr <- norm_vivo[gene_name,]
+  cluster_vivo <- factor(cluster_vivo,levels = order_label_vivo)
+  data_common <- data.frame(cluster_vivo,gene_expr)
+  ggplot2::ggplot(data_common, ggplot2::aes(x=cluster_vivo, y=gene_expr,fill= cluster_vivo)) +
+    ggplot2::geom_boxplot() + ggplot2::geom_jitter(position=ggplot2::position_jitter(0.2)) + ggplot2::xlab(x_name) + ggplot2::ylab(y_name) + ggplot2::ggtitle(title_name) + ggplot2::labs(fill = fill_name)
+}
+
 
 
 

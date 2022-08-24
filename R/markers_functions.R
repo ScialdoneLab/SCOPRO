@@ -187,3 +187,211 @@ filter_in_vitro <- function(norm_vitro, cluster_vitro, marker_all, fraction = 0.
   return(hvg_vivo_final)
 }
 
+
+#' select_common_genes_sc
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams select_common_genes
+#' @param threshold  fraction of cells in the in vitro cluster \emph{name_vitro}.
+#' Only the markers conserved in more than \emph{threshold} fraction of cells are given as output.
+#' @param SCOPRO_output  output given by function \emph{SCOPRO_single_cell}
+
+
+#' @return Character vector with the names of the conserved markers of \emph{name_vivo} stage in the cells of the \emph{name_vitro} cluster.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#'
+#' @export select_common_genes_sc
+#'
+
+
+select_common_genes_sc <- function (SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro, threshold = 0.5)
+{
+  if (sum(name_vivo %in% selected_stages) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+  }
+  if (sum(name_vitro %in% cluster_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+  }
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  cells_specific <- SCOPRO_output[[3]][cluster_vitro == name_vitro]
+  common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+  if (length(common_genes_cells) == 0) {
+    warning("There are not conserved genes between the cells in the in vitro cluster")
+    return(NULL)
+  }
+  if (length(common_genes_cells) > 0) {
+    common_genes <- common_genes_cells[common_genes_cells %in%
+                                         marker_specific]
+    if (length(common_genes) == 0) {
+      warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+    return(common_genes)
+  }
+  else{
+    return(NULL)
+  }
+}
+
+
+#' select_no_common_genes_sc
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams select_top_markers
+#' @inheritParams select_common_genes
+#' @inheritParams select_no_common_genes
+#' @param name_vitro  name of the in vitro stage for which we want to know the non-conserved markers with the \emph{name_vivo} stage
+#' @param SCOPRO_output output given by function \emph{SCOPRO_single_cell}
+#' @param threshold  fraction of cells in the in vitro cluster \emph{name_vitro}.
+#' Only the markers not conserved in more than \emph{threshold} fraction of cells are given as output.
+
+
+#' @return Character vector with the names of the non-conserved markers of \emph{name_vivo} stage in the \emph{name_vitro} cluster
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#'
+#' @export select_no_common_genes_sc
+#'
+
+select_no_common_genes_sc <- function (SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro, threshold = 0.5)
+{
+  if (sum(name_vivo %in% selected_stages) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+  }
+  if (sum(name_vitro %in% cluster_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+  }
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  cells_specific <- SCOPRO_output[[4]][cluster_vitro == name_vitro]
+  common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+  if (length(common_genes_cells) == 0) {
+    warning("There are not conserved genes between the cells in the in vitro cluster")
+    return(NULL)
+  }
+  if (length(common_genes_cells) > 0) {
+    common_genes <- common_genes_cells[common_genes_cells %in% marker_specific]
+    if (length(common_genes) == 0) {
+      warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+    return(common_genes)
+  }
+  else{
+    return(NULL)
+  }
+}
+
+
+
+
+
+
+
+#' markers_cluster_seurat
+#'
+#' The Seurat function \emph{FindMarkers} is used to identify general marker
+#' for each cluster (specific cluster vs all other cluster). This list of
+#' markers is then filtered keeping only the genes that appear as markers in a
+#' unique cluster.
+#'
+#' @param seurat_object Seurat object as returned by
+#' \emph{create_seurat_object}.
+#' @param cell_names Vector of length equal to the number of cells, with cell
+#' names.
+#' @param number_top Integer. Number of top marker genes to keep for each
+#' cluster.
+#' @param cluster Vector of length equal to the number of cells, with cluster
+#' assignment.
+#' @return List of three elements. The first is a vector with \emph{number_top}
+#' marker genes for each cluster. The second is a vector with \emph{number_top}
+#' marker genes and corresponding cluster. The third element is a vector with
+#' all marker genes for each cluster.
+#'
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://www.rdocumentation.org/packages/Seurat/versions/4.0.1/topics/FindMarkers}
+#'
+#' @export markers_cluster_seurat
+
+
+markers_cluster_seurat <- function (seurat_object, cluster, cell_names, number_top)
+{
+  if (sum(!unlist(lapply(list(c("Seurat","Biobase")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package Seurat and Biobase needed for this function to work. Please install them: install.packages('Seurat') and BiocManager::install('Biobase')")
+  }
+  level <- levels(as.factor(cluster))
+  marker_cluster <- as.list(rep(0, length(level)))
+  marker_all <- de_seurat_cluster(seurat_object, cluster, cell_names, 0.05)
+  for (i in 1:length(level)) {
+    marker_cluster[[i]] <- marker_all[[i]]
+    message(paste0("Cluster ", level[i]))
+  }
+  marker_all <- unlist(marker_cluster)
+  marker_all <- marker_all[Biobase::isUnique(marker_all)]
+  for (i in 1:length(level)) {
+    marker_cluster[[i]] <- marker_cluster[[i]][marker_cluster[[i]] %in%
+                                                 marker_all]
+  }
+  marker_to_see <- as.list(rep(0, length(level)))
+  marker_complete <- as.list(rep(0, length(level)))
+  for (i in 1:length(level)) {
+    if (length(marker_cluster[[i]]) >= number_top) {
+      marker_to_see[[i]] <- marker_cluster[[i]][1:number_top]
+      names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]]))
+      marker_complete[[i]] <- marker_cluster[[i]]
+      names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+    }
+    if ((length(marker_cluster[[i]]) > 0) & (length(marker_cluster[[i]]) <
+                                             number_top)) {
+      marker_to_see[[i]] <- marker_cluster[[i]][1:length(marker_cluster[[i]])]
+      names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]]))
+      marker_complete[[i]] <- marker_cluster[[i]]
+      names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+    }
+
+    if (length(marker_cluster[[i]]) == 0) {
+      marker_to_see[[i]] <- NULL
+      marker_complete[[i]] <- NULL
+
+    }
+  }
+  marker_top <- unlist(marker_to_see)
+  marker_top <- marker_top[marker_top != 0]
+  marker_complete <- unlist(marker_complete)
+  marker_complete <- marker_complete[marker_complete != 0]
+  marker_all_cluster_sing <- as.list(rep(0, length(level)))
+  for (i in 1:length(level)) {
+    if (sum(names(marker_top) == level[i]) > 0) {
+      marker_all_cluster_sing[[i]] <- paste(marker_top[names(marker_top) ==
+                                                         level[i]], level[i], sep = "_")
+    }
+
+    else {
+
+    }
+  }
+  marker_all_cluster <- unlist(marker_all_cluster_sing)
+  marker_all_cluster <- marker_all_cluster[marker_all_cluster !=
+                                             0]
+  return(list(marker_top, marker_all_cluster, marker_complete))
+}
+
+
+#' de_seurat_cluster
+#' @noRd
+de_seurat_cluster <- function(seurat_object, cluster, names_cell, max_p_value) {
+  level <- levels(as.factor(cluster))
+  final_markers <- vector("list", length(level))
+  for (i in 1:length(level)) {
+    markers <- Seurat::FindMarkers(seurat_object, ident.1 = names_cell[cluster == level[i]], ident.2 = names_cell[cluster!=level[i]], only.pos = T)
+    markers_new <- markers[markers$p_val_adj <= max_p_value, ]
+    markers_new <- markers_new[order(markers_new$p_val_adj), ]
+    markers_final <- row.names(markers_new)
+    final_markers[[i]] <- markers_final
+  }
+  return(final_markers)
+}
+
+
+

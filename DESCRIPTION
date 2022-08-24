@@ -11,12 +11,18 @@ Depends:
 Imports:
     ggplot2
 Suggests:
-    CIARA,
     rmarkdown,
     testthat (>= 3.0.0),
     knitr,
     Seurat (>= 4.0.0),
-    gplots
+    gplots,
+    scibetR,
+    scmap,
+    S4Vectors,
+    SingleCellExperiment,
+    SummarizedExperiment,
+    Biobase,
+    plyr
 VignetteBuilder: 
     knitr
 biocViews: software
