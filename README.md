@@ -112,7 +112,7 @@ names(markers_small) <- stages_markers
 For each in vivo stage, we select only the markers for which the median is above 0.1 and is below 0.1 in all the other stages.
 
 ```r
-marker_result <- select_top_markers(relevant_stages, cluster_mouse_published, norm_vivo, markers_small, max_number = 100, threshold = 0.1)
+marker_result <- select_top_markers(selected_stages, cluster_mouse_published, norm_vivo, markers_small, max_number = 100, threshold = 0.1)
 marker_all <- marker_result[[1]]
 marker_stages <- marker_result[[2]]
 ```
@@ -145,8 +145,8 @@ plot_score(analysis_2cell, marker_stages, marker_stages_filter, relevant_stages,
  We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluter 2.
 As expected the Zscan4 family genes are conserved.
 ```r
-common_genes <- select_common_genes(analysis_2cell, marker_stages, relevant_stages, "Late_2_cell", cluster_es_vitro, "2")
-no_common_genes <- select_no_common_genes(analysis_2cell, marker_stages, relevant_stages, "Late_2_cell", cluster_es_vitro, "2")
+common_genes <- select_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
+no_common_genes <- select_no_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
 
 
 
