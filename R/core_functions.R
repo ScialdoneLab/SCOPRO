@@ -53,6 +53,7 @@
 #' @importFrom stats median
 
 
+
 SCOPRO <- function(norm_vitro, norm_vivo, cluster_vitro, cluster_vivo, name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1,  marker_stages, selected_stages){
   if (sum(selected_stages %in% name_vivo) == 0) {
     stop("name_vivo must be one the stages present in the vector selected_stages")

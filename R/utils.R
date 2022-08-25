@@ -1,3 +1,4 @@
+globalVariables(c("..count.."))
 #' detect_expressed_genes
 #' @noRd
 detect_expressed_genes <- function(norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0){
