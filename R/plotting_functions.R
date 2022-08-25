@@ -390,3 +390,588 @@ plot_boxplot <- function(norm_vivo, gene_name, cluster_vivo, order_label_vivo, t
 
 
 
+
+
+
+#' plot_in_vivo_markers
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @param coordinate_umap data frame with umap coordinates (UMAP 1 and UMAP2).
+#' @param threshold Numeric value.
+#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are epxressed above \emph{threshold}
+#' @return ggplot2::ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#'
+#'
+#'
+#' @export plot_in_vivo_markers
+#'
+plot_in_vivo_markers <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, title_name){
+  if (sum(!unlist(lapply(list(c("grDevices","gplots")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package gplots and grDevices needed for this function to work. Please install them: install.packages('gplots') and install.packages('grDevices')")
+  }
+  rank_intersect = detect_expressed_genes(norm_vitro, marker_stages, selected_stages, name_vivo, 0)
+  ramp <- grDevices::colorRamp(c("white", "darkorange3"))
+  length_ramp <- length(unique(rank_intersect))
+  ramp.list <- grDevices::rgb( ramp(seq(0, 1, length = length_ramp)), max = 255)
+  index_color=round(length(ramp.list)/2,0)
+  breaks <- seq(0,1,length.out=1000)
+  gradient1 <- gplots::colorpanel( sum( breaks[-1]<= as.numeric(stats::quantile(breaks,0.50))), "#FFFFFF",ramp.list[index_color])
+  gradient2 <- gplots::colorpanel( sum( breaks[-1] > as.numeric(stats::quantile(breaks,0.50)) ), ramp.list[index_color], "#CD6600" )
+  hm.colors_esc <- c(gradient1,gradient2)
+  index_sort <- order(rank_intersect)
+  row.names(coordinate_umap) <- colnames(norm_vitro)
+  coordinate_umap <- coordinate_umap[colnames(norm_vitro)[index_sort], ]
+  rank_intersect <- sort(rank_intersect)
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[,
+                                                                             1], coordinate_umap[, 2])) + ggplot2::geom_point(ggplot2::aes(colour = rank_intersect), size = 1) + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::ggtitle(title_name) + ggplot2::labs(col= paste0("Number of markers")) + ggplot2::theme(panel.grid.major = ggplot2::element_blank(), panel.grid.minor = ggplot2::element_blank(), axis.ticks = ggplot2::element_blank(), axis.text = ggplot2::element_blank(), text = ggplot2::element_text(size = 14, family = "Helvetica")) + ggplot2::scale_colour_gradientn(colors = hm.colors_esc)
+  return((umap_plot))
+}
+
+
+#' plot_in_vivo_markers_interactive
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_in_vivo_markers
+#' @param max_number Integer. Maximum number of genes name to show.
+#' @param min_x Set the min limit on the x axis.
+#' @param max_x Set the max limit on the x axis.
+#' @param min_y Set the min limit on the y axis.
+#' @param max_y Set the min limit on the y axis.
+#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are epxressed above \emph{threshold}.
+#' It is based on plotly library.
+#' @return plotly object given by \emph{plot_ly function} (from library \emph{plotly}).
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://plotly.com/r/}
+#'
+#'
+#'
+#' @export plot_in_vivo_markers_interactive
+#'
+
+
+
+plot_in_vivo_markers_interactive <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, max_number = 5, min_x = NULL, max_x = NULL, min_y = NULL, max_y = NULL){
+  if (sum(!unlist(lapply(list(c("grDevices","plotly")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package plotly and grDevices needed for this function to work. Please install them: install.packages('plotly') and install.packages('grDevices')")
+  }
+  rank_intersect <- detect_expressed_genes(norm_vitro, marker_stages, selected_stages, name_vivo, threshold)
+  ramp <- grDevices::colorRamp(c("white", "darkorange3"))
+  length_ramp <- length(unique(rank_intersect))
+  ramp.list <- grDevices::rgb( ramp(seq(0, 1, length = length_ramp)), max = 255)
+  index_sort <- order(rank_intersect)
+  list_intersect <- detect_names_genes(norm_vitro, marker_stages, selected_stages, name_vivo, threshold)
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  marker_specific <- marker_specific[marker_specific %in% row.names(norm_vitro)]
+  text <- names_marker_genes(list_intersect, marker_specific, max_number)
+  text <- text[index_sort]
+  row.names(coordinate_umap) <- colnames(norm_vitro)
+  coordinate_umap <- coordinate_umap[colnames(norm_vitro)[index_sort], ]
+  rank_intersect <- sort(rank_intersect)
+  colnames(coordinate_umap) <- c("UMAP_1", "UMAP_2")
+  fig <- plotly::plot_ly(data = coordinate_umap, x = ~UMAP_1,
+                         y = ~UMAP_2, color = ~rank_intersect, type = "scatter",
+                         mode = "markers", marker = list(size = 5, width = 2,
+                                                         line = list(color = "black", width = 0.5)), text = ~text,
+                         hoverinfo = "text", colors = ramp.list)
+  if (!is.null(min_x)) {
+    fig <- fig %>% plotly::layout(xaxis = list(range = c(min_x,
+                                                         max_x)), yaxis = list(range = c(min_y, max_y))) %>%
+      plotly::layout(plot_bgcolor = "rgb(254, 247, 234)") %>%
+      plotly::layout(paper_bgcolor = "rgb(254, 247, 234)")
+  }
+  return(fig)
+}
+
+
+
+
+#' heatmap_markers_vivo
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_in_vivo_markers
+#' @param max_number Integer. Maximum number of genes to show for each \emph{selected_stages}.
+#' @param color_vector Character vector with colour assignment.
+#' @return Heatmap class object
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}
+#'
+#'
+#'
+#' @export heatmap_markers_vivo
+#'
+
+
+
+heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
+
+
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+    }
+  }
+  marker_stages_top <- rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] <- marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] <- marker_stages[[i]]}
+  }
+  marker_all <- unlist(marker_stages_top)
+  cluster_vivo <- factor(cluster_vivo, levels = selected_stages)
+  index_list <- rep(list(0), length(levels(cluster_vivo)))
+  for ( i in 1:length(levels(cluster_vivo))){
+    index_list[[i]] <- which(cluster_vivo == levels(cluster_vivo)[i])
+
+  }
+
+  index_all <- unlist(index_list)
+
+
+  heatdata <- norm_vivo[marker_all, index_all]
+  cluster_vivo <- cluster_vivo[index_all]
+  cluster_unique <- unique(cluster_vivo)
+  row.names(heatdata) <- marker_all
+
+  if(is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- color_vector[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vivo dataset", length(cluster_vivo))
+  data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                                  , name = "log norm counts"
+                                  #, column_title = "Absolute values"
+                                  #, cluster_columns = as.dendrogram(my.tree)
+                                  ,cluster_columns = F
+                                  , cluster_rows =F
+                                  , top_annotation = haCol1
+                                  , row_names_gp = grid::gpar(fontsize = 6)
+                                  , show_column_names = F
+                                  , show_row_names = T
+  )
+  ComplexHeatmap::draw(ht21)
+}
+
+
+
+#' heatmap_markers_vivo_median_profile
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_in_vivo_markers
+#' @inheritParams heatmap_markers_vivo
+#' @return Heatmap class object
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}
+#'
+#'
+#'
+#' @export heatmap_markers_vivo_median_profile
+#'
+
+
+heatmap_markers_vivo_median_profile <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
+
+
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+    }
+  }
+  marker_stages_top <- rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] = marker_stages[[i]]}
+  }
+  marker_all <- unlist(marker_stages_top)
+
+
+  median_es <- find_median_cluster(cluster_vivo, selected_stages, norm_vivo, marker_all)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_all
+
+  heatdata <- median_es_matrix
+
+  cluster_vivo <- selected_stages
+  cluster_unique=unique(cluster_vivo)
+  row.names(heatdata) <- marker_all
+
+  if(is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- color_vector[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vivo dataset", length(cluster_vivo))
+  data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                                  , name = "log norm counts"
+                                  #, column_title = "Absolute values"
+                                  #, cluster_columns = as.dendrogram(my.tree)
+                                  ,cluster_columns = F
+                                  , cluster_rows =F
+                                  , top_annotation = haCol1
+                                  , row_names_gp = grid::gpar(fontsize = 6)
+                                  , show_column_names = F
+                                  , show_row_names = T
+  )
+  ComplexHeatmap::draw(ht21)
+}
+
+
+
+#' heatmap_markers_vitro
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_in_vivo_markers
+#' @inheritParams heatmap_markers_vivo
+#' @param marker_plot Character vector with the names of the genes to plot.
+#' @return Heatmap class object
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}
+#'
+#'
+#'
+#' @export heatmap_markers_vitro
+#'
+
+
+heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
+
+  if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+    stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+  }
+  marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+
+  cluster_vitro <- factor(cluster_vitro)
+  index_list = rep(list(0), length(levels(cluster_vitro)))
+  for ( i in 1:length(levels(cluster_vitro))){
+    index_list[[i]] = which(cluster_vitro == levels(cluster_vitro)[i])
+
+  }
+
+  index_all <- unlist(index_list)
+
+
+
+  heatdata <- norm_vitro[marker_plot, index_all]
+  cluster_vitro <- cluster_vitro[index_all]
+  cluster_unique <- unique(cluster_vitro)
+  row.names(heatdata) <- marker_plot
+
+  if(is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- color_vector[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vitro dataset", length(cluster_vitro))
+  data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                                  , name = "log norm counts"
+                                  #, column_title = "Absolute values"
+                                  #, cluster_columns = as.dendrogram(my.tree)
+                                  ,cluster_columns = F
+                                  , cluster_rows =F
+                                  , top_annotation = haCol1
+                                  , row_names_gp = grid::gpar(fontsize = 6)
+                                  , show_column_names = F
+                                  , show_row_names = T
+  )
+  ComplexHeatmap::draw(ht21)
+}
+
+
+
+
+#' heatmap_markers_vitro_mean_profile
+#'
+#' @inheritParams SCOPRO
+#' @inheritParams plot_score_genes
+#' @inheritParams plot_in_vivo_markers
+#' @inheritParams heatmap_markers_vivo
+#' @inheritParams heatmap_markers_vitro
+#' @return Heatmap class object
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}
+#'
+#'
+#'
+#' @export heatmap_markers_vitro_mean_profile
+#'
+
+
+
+heatmap_markers_vitro_mean_profile <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
+  if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+    stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+  }
+  marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+
+
+  selected_stages <- levels(factor(cluster_vitro))
+  median_es <- find_mean_cluster(cluster_vitro, selected_stages, norm_vitro, marker_plot)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_plot
+
+  heatdata <- median_es_matrix
+
+  cluster_vitro <- selected_stages
+  cluster_unique <- unique(cluster_vitro)
+
+
+  if(is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster)=as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- color_vector[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vitro dataset", length(cluster_vitro))
+  data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                                  , name = "log norm counts"
+                                  #, column_title = "Absolute values"
+                                  #, cluster_columns = as.dendrogram(my.tree)
+                                  ,cluster_columns = F
+                                  , cluster_rows =F
+                                  , top_annotation = haCol1
+                                  , row_names_gp = grid::gpar(fontsize = 6)
+                                  , show_column_names = F
+                                  , show_row_names = T
+  )
+  ComplexHeatmap::draw(ht21)
+}
+
+
+#' plot_umap
+#' @param coordinate_umap Data frame with dimensionality reduction coordinates.
+#' Number of rows must be equal to the number of cells
+#' @param cluster Vector with cluster assignment. The length must be qual to the number of cells
+#' @return ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://CRAN.R-project.org/package=ggplot2}
+#' @export plot_umap
+
+
+
+plot_umap <- function(coordinate_umap, cluster){
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[, 1], coordinate_umap[, 2] )) +
+    ggplot2::geom_point(ggplot2::aes(colour = as.factor(cluster))) + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::labs(col = "Cluster")
+  return(list(umap_plot))
+}
+
+#' plot_gene
+#'
+#' Cells are coloured according to the expression of \emph{gene_id} and plotted
+#' according to \emph{coordinate_umap}.
+#'
+#' @param gene_id Character name of the gene.
+#' @param title_name Character name.
+#' @param norm_matrix Data frame with cells on the columns and genes on the rows
+#' @inheritParams plot_umap
+#' @return ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://CRAN.R-project.org/package=ggplot2}
+#'
+#' @export plot_gene
+
+
+plot_gene <- function(norm_matrix, coordinate_umap, gene_id, title_name){
+
+
+  gene_expr <- as.vector(norm_matrix[gene_id, ])
+  index_sort <- order(gene_expr)
+  row.names(coordinate_umap) <- colnames(norm_matrix)
+  coordinate_umap <- coordinate_umap[colnames(norm_matrix)[index_sort], ]
+  gene_expr <- sort(gene_expr)
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[, 1], coordinate_umap[, 2] )) +
+    ggplot2::geom_point(ggplot2::aes(colour = (gene_expr)))  + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::labs(col = "Log norm counts")+
+    ggplot2::scale_colour_gradient(low = "white", high = "blue") +
+    ggplot2::ggtitle(title_name)
+  return((umap_plot))
+}
+
+
+
+#' plot_qc_cluster
+#'
+#'
+#' @param seurat_object Output of the function \emph{create_seurat_object}
+#' @param mit_prefix Character name. Starting letters to identify mitochondrial genes
+#' @param rib_prefix_1 Character name. Starting letters to identify ribosomial genes
+#' @param rib_prefix_2 Character name. Starting letters to identify ribosomial genes
+#' @inheritParams SCOPRO
+#' @return ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://CRAN.R-project.org/package=ggplot2}
+#'
+#' @export plot_qc_cluster
+
+
+
+plot_qc_cluster <- function(seurat_object,cluster_vitro,mit_prefix,rib_prefix_1,rib_prefix_2){
+
+  raw_counts <- (Seurat::GetAssayData(seurat_object, slot = "counts",assay="RNA"))
+  sum_umi <- apply(raw_counts,2,sum)
+  sum_geni <- apply(raw_counts,2,function(x){
+    x <- x[x!=0]
+    return(length(x))
+  })
+
+
+  frac_mito <- apply(raw_counts,2,function(x){
+    return(sum(x[grep(mit_prefix,row.names(raw_counts))])/sum(x))
+
+
+
+  })
+
+
+  frac_ribo <- apply(raw_counts,2,function(x){
+    frac_ribo_s <- x[grep(rib_prefix_1, row.names(raw_counts))]
+    frac_ribo_l <- x[grep(rib_prefix_2, row.names(raw_counts))]
+    frac_ribo_all <- c(frac_ribo_s, frac_ribo_l)
+    return(sum(frac_ribo_all) / sum(x))
+  })
+
+
+  cluster_vitro <- as.factor(cluster_vitro)
+
+  data_plot <- data.frame(as.numeric(frac_mito), as.numeric(sum_geni), as.numeric(sum_umi), as.numeric(frac_ribo),cluster_vitro)
+
+
+  plot_1 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=frac_mito,fill=cluster_vitro)) + ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("frac mito reads") + ggplot2::ggtitle("Frac mito reads")
+
+
+  plot_2 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=sum_umi,fill=cluster_vitro)) +
+    ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("UMI counts") + ggplot2::ggtitle("UMI counts")
+
+  plot_3 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=sum_geni,fill=cluster_vitro)) +
+    ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("Number of genes") + ggplot2::labs(color="Cluster") + ggplot2::ggtitle("Number of genes")
+
+  plot_4 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=frac_ribo, fill=cluster_vitro)) +
+    ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("Frac ribo reads") + ggplot2::labs(color="Cluster") + ggplot2::ggtitle("Frac ribo reads")
+  return (list(plot_1, plot_2, plot_3, plot_4))
+}
+
+
+#' plot_barplot
+#'
+#'
+#' @param fraction Logical. If TRUE, for each \emph{cluster_vitro}, the fraction of cells
+#' mapped to the in vivo stages are shown. If FALSE, the number of cells mapped to the in vivo stages are shown
+#' @inheritParams SCOPRO
+#' @inheritParams findCellTypesSeurat
+#' @inheritParams findCellTypesScibet
+#' @inheritParams findCellTypes_scmap
+#' @inheritParams cellTypesPerClusterBalloonPlot
+#' @param obj Seurat object given as output from functions \emph{findCellTypesSeurat}, \emph{findCellTypesScibet} or
+#' \emph{findCellTypes_scmap}
+#' @return ggplot2 object.
+#' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
+#' @seealso \url{https://CRAN.R-project.org/package=ggplot2}
+#'
+#' @export plot_barplot
+
+
+plot_barplot <- function(obj, method, cluster_vitro, threshold, fraction = TRUE){
+  if (method == "Seurat") {
+
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= threshold] <- "Unassigned"
+    df=data.frame(obj@meta.data$predicted.id,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = ggplot2::element_text(size=14),axis.text.x = ggplot2::element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+  }
+  if (method == "scibetR") {
+    df=data.frame(obj@meta.data$predictions,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = ggplot2::element_text(size=14),axis.text.x = ggplot2::element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+  }
+  if (method == "scmap") {
+    df=data.frame(obj@meta.data$predictions,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = ggplot2::element_text(size=14),axis.text.x = ggplot2::element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+  }
+  if (method != "Seurat" & method != "scibetR" & method !=
+      "scmap") {
+    stop("method must be equal to Seurat, ScibetR or scmap.")
+  }
+}
+
+
+
+
+
+
