@@ -1106,8 +1106,10 @@ plot_in_vivo_markers <- function (coordinate_umap, norm_vitro, marker_stages, se
 
 
 ```{r}
-plot_in_vivo_markers_interactive <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, max_number = 5, min_x = NULL, max_x = NULL, min_y = NULL, max_y = NULL) 
-  {
+plot_in_vivo_markers_interactive <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, max_number = 5, min_x = NULL, max_x = NULL, min_y = NULL, max_y = NULL){
+  if (sum(!unlist(lapply(list(c("grDevices","plotly")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package plotly and grDevices needed for this function to work. Please install them: install.packages('plotly') and install.packages('grDevices')")
+  }
   rank_intersect <- detect_expressed_genes(norm_vitro, marker_stages, selected_stages, name_vivo, threshold)
   ramp <- grDevices::colorRamp(c("white", "darkorange3"))
   length_ramp <- length(unique(rank_intersect))
@@ -1122,9 +1124,6 @@ plot_in_vivo_markers_interactive <- function (coordinate_umap, norm_vitro, marke
   row.names(coordinate_umap) <- colnames(norm_vitro)
   coordinate_umap <- coordinate_umap[colnames(norm_vitro)[index_sort], ]
   rank_intersect <- sort(rank_intersect)
-  if (!requireNamespace("plotly", quietly = TRUE)) {
-        stop("Package plotly needed for interactive == TRUE. Please install it: install.packages('plotly')")
-    }
     colnames(coordinate_umap) <- c("UMAP_1", "UMAP_2")
     fig <- plotly::plot_ly(data = coordinate_umap, x = ~UMAP_1, 
         y = ~UMAP_2, color = ~rank_intersect, type = "scatter", 
@@ -1154,6 +1153,14 @@ plot_in_vivo_markers_interactive(cordinate_umap_0, norm_vitro, marker_stages, se
 ```
 
 ```{r }
+SCOPRO::plot_umap(cordinate_umap_0, cluster_vitro)
+
+```
+```{r }
+SCOPRO::plot_gene(norm_vitro, cordinate_umap_0,"Zscan4c","Zscan4c")
+
+```
+```{r }
 find_median_cluster <- function(cluster_vivo, selected_stages, norm_vivo, genes){
 number_cluster <- selected_stages
 median_es <- rep(list(0),length(number_cluster))
@@ -1174,9 +1181,7 @@ return(median_es)}
 ```
 
 ```{r }
-norm_vivo= norm_vivo_small
-cluster_vivo = cluster_mouse_published_small
-max_number =10
+
 plot_heatmap_vivo <- function(norm_vivo, cluster_vivo, marker_stages, selected_stages, max_number = 10, name_title) {
   for (i in selected_stages){
     index_specific <- which(selected_stages %in% i)
@@ -1237,6 +1242,9 @@ for (i in selected_stages){
 ```{r }
 
 heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
   
   
   for (i in selected_stages){
@@ -1307,6 +1315,9 @@ heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_
 ```{r }
 
 heatmap_markers_vivo_median_profile <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
   
   
   for (i in selected_stages){
@@ -1375,6 +1386,9 @@ heatmap_markers_vivo_median_profile <- function(norm_vivo, marker_stages, select
 ```{r }
 
 heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
   
   if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
     stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
@@ -1434,6 +1448,9 @@ heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_
 ```{r }
 
 heatmap_markers_vitro_mean_profile <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
   if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
     stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
   }
@@ -1487,11 +1504,11 @@ heatmap_markers_vitro_mean_profile <- function(norm_vitro, marker_plot, cluster_
 ```
 
 ```{r }
-heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_vivo_small, color_vector = NULL)
+heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, color_vector = NULL)
 ```
 
 ```{r }
-heatmap_markers_vivo_median_profile(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_vivo_small, color_vector = NULL)
+heatmap_markers_vivo_median_profile(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, color_vector = NULL)
 ```
 
 ```{r }
@@ -1595,49 +1612,55 @@ plot_qc_cluster(mayra_seurat_0, cluster_vitro,"mt-","Rps","Rpl")
 ```
 
 
-## To change
+
 ```{r}
 
-barplot_cell_cycle=function(cell_cycle,cluster,title,fraction=TRUE){
-dfForPlot <- data.frame(Phases =cell_cycle
-                                ,clu =cluster)
-
-if(fraction==TRUE){
-pnm <-ggplot(dfForPlot, aes(y=cell_cycle,x=cluster))+geom_bar( aes(fill = cell_cycle,y = (..count..)/sum(..count..)),position="fill")+ ggtitle(title)+ylab("Fraction of cells")+xlab("Cluster")+labs(fill="Spatial origin")+theme(text = element_text(size=10),
-        axis.text.x = element_text(angle=90, hjust=1,size=6)) 
+create_barplot <- function(cell_cycle, cluster, title,fraction = TRUE){
+  dfForPlot <- data.frame(Phases = cell_cycle, clu = cluster)
+  if(fraction == TRUE){
+    pnm <- ggplot2::ggplot(dfForPlot, ggplot2::aes(y = cell_cycle, x = cluster)) + ggplot2::geom_bar( ggplot2::aes(fill = cell_cycle, y = (..count..)/sum(..count..)), position = "fill") + ggplot2::ggtitle(title) + ggplot2::ylab("Fraction of cells") + ggplot2::xlab("Cluster") + ggplot2::labs(fill = "In vivo stage")
 pnm}
 
-if(fraction!=TRUE){
-  pnm <-ggplot(dfForPlot, aes(y=cell_cycle,x=cluster))+geom_bar( aes(fill = cell_cycle,y = (..count..),position="fill"))+ ggtitle(title)+ylab("Number of cells")+xlab("Cluster")+labs(fill="Spatial origin")+theme(text = element_text(size=10),
-        axis.text.x = element_text(angle=90, hjust=1,size=6)) 
+if(fraction != TRUE){
+  pnm <- ggplot2::ggplot(dfForPlot, ggplot2::aes(y = cell_cycle, x = cluster)) + ggplot2::geom_bar( ggplot2::aes(fill = cell_cycle, y = (..count..), position="fill"))+ ggplot2::ggtitle(title) + ggplot2::ylab("Number of cells") + ggplot2::xlab("Cluster") + ggplot2::labs(fill = "In vivo stage")
 pnm
-
-
 }
 return(list(pnm))}
 ```
 
 ```{r }
 
-
-df=data.frame(original_sub[select_endo],origin_space[select_endo])
-colnames(df)=c("cluster","origin_space")
-
-p=barplot_cell_cycle(df[,2],df[,1],"Endoderm - spatial origin",fraction = T)
-
-p[[1]]+theme(text = element_text(size=14),axis.text.x = element_text(size=14,angle = 45, vjust = 1, hjust = 1))
+plot_barplot <- function(obj, method, cluster_vitro, thresold, fraction = TRUE){
+  if (method == "Seurat") {
+    
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+    df=data.frame(obj@meta.data$predicted.id,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = element_text(size=14),axis.text.x = element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+    }
+  if (method == "scibetR") {
+    df=data.frame(obj@meta.data$predictions,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = element_text(size=14),axis.text.x = element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+    }
+  if (method == "scmap") {
+    df=data.frame(obj@meta.data$predictions,cluster_vitro)
+    colnames(df)=c("projection_result","cluster_vitro")
+    p = create_barplot(df[,1],df[,2],paste0("Projection result ", method),fraction = fraction)
+    return(p[[1]]+ggplot2::theme(text = element_text(size=14),axis.text.x = element_text(size=14,angle = 45, vjust = 1, hjust = 1)))
+    }
+  if (method != "Seurat" & method != "scibetR" & method != 
+        "scmap") {
+    stop("method must be equal to Seurat, ScibetR or scmap.")
+  }
+  }
 
 ```
 
 
-```{r }
 
-
-
-
-
-
-```
 
 
 # Run SCOPRO with single cell mode
@@ -1752,7 +1775,23 @@ mayra_seurat_0_scmap <- findCellTypes_scmap(queryObj = mayra_seurat_0, reference
  
  
 ```
+```{r }
 
+plot_barplot(mayra_seurat_0_scibet, method = "scibetR", cluster_vitro, threshold = 0.1, fraction = TRUE)
+plot_barplot(mayra_seurat_0_scibet, method = "scibetR", cluster_vitro, threshold = 0.1, fraction = FALSE)
+
+
+plot_barplot(mayra_seurat_0_seurat, method = "Seurat", cluster_vitro, threshold = 0.1, fraction = TRUE)
+plot_barplot(mayra_seurat_0_seurat, method = "Seurat", cluster_vitro, threshold = 0.1, fraction = FALSE)
+
+
+plot_barplot(mayra_seurat_0_scmap, method = "scmap", cluster_vitro, threshold = 0.1, fraction = TRUE)
+plot_barplot(mayra_seurat_0_scmap, method = "scmap", cluster_vitro, threshold = 0.1, fraction = FALSE)
+
+
+
+
+```
 
 # SCOPRO without late 2 cells 
 
