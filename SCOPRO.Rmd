@@ -1,0 +1,2889 @@
+---
+title: "SCOPRO"
+author: "Gabriele Lubatti"
+date: "8/12/2022"
+output: html_document
+---
+
+```{r}
+gc()
+rm(list=ls())
+
+```
+
+```{r }
+library(CIARA)
+library(ggplot2)
+library(SCOPRO)
+library(Seurat)
+```
+
+# Function to add
+
+```{r}
+select_common_genes_sc <- function (SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro, threshold = 0.5) 
+{
+  if (sum(name_vivo %in% selected_stages) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+  if (sum(name_vitro %in% cluster_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+    }
+    index_specific <- which(selected_stages %in% name_vivo)
+    marker_specific <- marker_stages[[index_specific]]
+    cells_specific <- analysis_2cell_sc[[3]][cluster_vitro == name_vitro]
+    common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+    if (length(common_genes_cells) == 0) {
+      warning("There are not conserved genes between the cells in the in vitro cluster")
+      return(NULL)
+      }
+    if (length(common_genes_cells) > 0) {
+      common_genes <- common_genes_cells[common_genes_cells %in% 
+        marker_specific]
+      if (length(common_genes) == 0) {
+        warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+      return(common_genes)
+      }
+    else{
+      return(NULL)
+    }
+    }
+```
+
+```{r}
+select_no_common_genes_sc <- function (SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro, threshold = 0.5)
+  {
+  if (sum(name_vivo %in% selected_stages) == 0) {
+    stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+  if (sum(name_vitro %in% cluster_vitro) == 0) {
+    stop("name_vitro must be one the stages present in the vector cluster_vitro")
+    }
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  cells_specific <- analysis_2cell_sc[[4]][cluster_vitro == name_vitro]
+  common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+  if (length(common_genes_cells) == 0) {
+    warning("There are not conserved genes between the cells in the in vitro cluster")
+    return(NULL)
+    }
+  if (length(common_genes_cells) > 0) {
+    common_genes <- common_genes_cells[common_genes_cells %in% marker_specific]
+    if (length(common_genes) == 0) {
+      warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+    return(common_genes)
+    }
+  else{
+    return(NULL)
+  }
+  }
+```
+
+```{r}
+findCellTypes_scmap <- function(queryObj, referenceObj, namedLabels, n_features = 500, threshold = 0.7) {
+  
+  
+  
+  if (!(requireNamespace(c("scmap","SingleCellExperiment","SummarizedExperiment","S4Vectors"), quietly = TRUE))) {
+    stop("Package scmap and SingleCellExperiment needed for this function to work. Please install them: BiocManager::install('scmap'), BiocManager::install('SingleCellExperiment'), BiocManager::install('SummarizedExperiment') and BiocManager::install('S4Vectors')")
+    }
+  norm_vivo <- as.matrix(GetAssayData(referenceObj, slot = "data",assay="RNA"))
+  raw_vivo <- as.matrix(GetAssayData(referenceObj, slot = "counts",assay="RNA"))
+
+  norm_vitro <- as.matrix(GetAssayData(queryObj, slot = "data",assay="RNA"))
+
+  raw_vitro <- as.matrix(GetAssayData(queryObj, slot = "counts",assay="RNA"))
+
+  sce_pro <- SingleCellExperiment::SingleCellExperiment(assays = list(normcounts = as.matrix(norm_vitro)))
+
+ SingleCellExperiment::logcounts(sce_pro) <- (SingleCellExperiment::normcounts(sce_pro))
+SummarizedExperiment::rowData(sce_pro)$feature_symbol <- rownames(sce_pro)
+ counts(sce_pro)=as.matrix(raw_vitro)
+
+
+
+ cell_type1 <- as.data.frame(namedLabels)
+ row.names(cell_type1) <- colnames(norm_vivo)
+ colnames(cell_type1) <- "cells_type1"
+
+ sce <- SingleCellExperiment::SingleCellExperiment(assays = list(normcounts =  as.matrix(norm_vivo)), colData = cell_type1)
+ SingleCellExperiment::logcounts(sce) <- (SingleCellExperiment::normcounts(sce))
+counts(sce) <- (raw_vivo)
+
+
+SummarizedExperiment::rowData(sce)$feature_symbol <- rownames(sce)
+sce <- sce[!duplicated(rownames(sce)), ]
+sce
+sce <- scmap::selectFeatures(sce, suppress_plot = TRUE,n_features = n_features)
+
+
+
+sce <- scmap::indexCluster(sce,cluster_col = "cells_type1")
+
+
+
+scmapCluster_results <- scmap::scmapCluster(
+  projection = sce_pro, 
+  index_list = list(
+    yan = S4Vectors::metadata(sce)$scmap_cluster_index
+  ),threshold = threshold
+  
+  
+  
+  
+)
+
+result_label <- as.vector(scmapCluster_results$scmap_cluster_labs)
+
+queryObj <- Seurat::AddMetaData(object = queryObj, metadata = result_label, col.name = "predictions")
+
+return(queryObj)
+}
+```
+
+```{r}
+findCellTypesScibet <- function(queryObj, referenceObj, namedLabels){
+if (!(requireNamespace(c("scibetR"), quietly = TRUE))) {
+        stop("Package scibetR needed for this function to work. Please install it: devtools::install_github('PaulingLiu/scibet')")
+    }
+
+norm_vitro <- as.matrix(GetAssayData(queryObj, slot = "data",assay="RNA"))
+norm_vitro <- t(norm_vitro)
+norm_vitro <- apply(norm_vitro, 2, as.numeric)
+norm_vitro <- as.data.frame(norm_vitro)
+norm_vivo <- as.data.frame(GetAssayData(referenceObj, slot = "data",assay="RNA"))
+norm_vivo <- t(norm_vivo)
+norm_vivo <- apply(norm_vivo, 2, as.numeric)
+norm_vivo <- as.data.frame(norm_vivo)
+norm_vivo_full <- cbind(norm_vivo,as.vector(namedLabels))
+colnames(norm_vivo_full)=c(colnames(norm_vivo),"label")
+norm_vivo_full <- as.data.frame(norm_vivo_full)
+row.names(norm_vivo_full)=NULL
+
+predictions <- scibetR::SciBet_R(norm_vivo_full,norm_vitro)
+queryObj <- Seurat::AddMetaData(object = queryObj, metadata = predictions, col.name = "predictions")
+return(queryObj)
+}
+```
+
+```{r }
+
+plot_boxplot <- function(norm_vivo,gene_name, cluster_vivo, order_label_vivo, title, name_fill, x_axis, y_axis){
+  gene_expr <- norm_vivo[gene_name,]
+ cluster_vivo <- factor(cluster_vivo,levels = order_label_vivo)
+ data_common <- data.frame(cluster_vivo,gene_expr)
+ ggplot(data_common, aes(x=cluster_vivo, y=gene_expr,fill= cluster_vivo)) +
+ geom_boxplot() + geom_jitter(position=position_jitter(0.2)) + xlab(x_axis) + ylab(y_axis) + ggtitle(title) + labs(fill=name_fill)
+}
+```
+
+
+```{r }
+plot_score_sc <- function (SCOPRO_output, cluster_vitro, marker_stages, marker_stages_filter, selected_stages, name_vivo, y_name, fill_name, title_name) 
+{
+  final_score <- c(as.vector(unlist(SCOPRO_output[[5]])))
+  label <- cluster_vitro
+  df <- data.frame(final_score, label)
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = label, y = final_score, 
+        fill = label)) + geom_boxplot()+geom_jitter(position=position_jitter(0.2)) + 
+        ggplot2::theme_minimal()
+  p + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+        vjust = 1, hjust = 1), axis.title.x = ggplot2::element_blank()) + 
+        ggplot2::ylab(y_name) + ggplot2::labs(fill = fill_name) + 
+        ggplot2::ylim(c(-0.1, 1)) + ggplot2::ggtitle(paste0(title_name, 
+        " (", sum(marker_stages_filter %in% marker_specific), 
+        " genes)", sep = " "))
+}
+```
+
+```{r }
+SCOPRO_single_cell <- function (norm_vitro, norm_vivo, cluster_vivo, 
+    name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1, 
+    fold_change = 3, threshold_fold_change = 0.1, marker_stages, 
+    selected_stages) 
+{
+    if (sum(selected_stages %in% name_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+    if (sum(cluster_vivo %in% name_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector cluster_vivo")
+    }
+    if (sum(selected_stages %in% cluster_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector cluster_vivo")
+    }
+    if (length(marker_stages_filter) == 0) {
+        stop("Vector marker_stages_filter has 0 length. Please provide a non-zero length vector.")
+    }
+    mean_2_cell <- SCOPRO:::mean_stage(norm_vivo, cluster_vivo, name_vivo, 
+        marker_stages_filter)
+    connettivity_vivo <- SCOPRO:::find_connettivity(mean_2_cell, fold_change, 
+        threshold_fold_change)
+    name_cells <- colnames(norm_vitro)
+    link_kept <- rep(list(0), length(name_cells))
+    link_no_kept <- rep(list(0), length(name_cells))
+    final_score <- rep(list(0), length(name_cells))
+    for (i in 1:length(colnames(norm_vitro))) {
+      single_cell_value= norm_vitro[marker_stages_filter,i]
+        connettivity_vitro <- SCOPRO:::find_connettivity(single_cell_value, 
+            fold_change, threshold_fold_change)
+        connettivity_vitro <- connettivity_vitro[row.names(connettivity_vivo), 
+            colnames(connettivity_vivo)]
+        index_specific <- which(selected_stages %in% name_vivo)
+        marker_specific <- marker_stages[[index_specific]]
+        if (length(marker_specific) == 0) {
+          stop(paste0("There are no markers for the stage: ", name_vivo))
+        }
+        result_comparison <- SCOPRO:::comparison_vivo_vitro(connettivity_vivo, 
+            connettivity_vitro, threshold, number_link, marker_specific)
+        link_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]] == 1]
+      if (length(link_kept[[i]]) == 0) {
+        warning(paste0("There are not conserved genes between ", name_vivo, " and ", colnames(norm_vitro)[i]))}
+        link_no_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]] != 1]
+        names(link_kept[[i]]) <- rep(colnames(norm_vitro)[i], length(link_kept[[i]]))
+        names(link_no_kept[[i]]) <- rep(colnames(norm_vitro)[i], length(link_no_kept[[i]]))
+        final_score[[i]] <- result_comparison[[3]]
+        names(final_score[[i]]) <- colnames(norm_vitro)[i]
+    }
+    common_link <- Reduce(intersect, link_kept)
+    if (length(common_link) == 0) {
+        warning(paste0("There are not conserved genes between all the in vitro cells and ", name_vivo))
+    }
+    no_common_link <- Reduce(intersect, link_no_kept)
+    return(list(common_link, no_common_link, link_kept, link_no_kept, 
+        final_score))
+}
+
+
+```
+
+```{r}
+markers_cluster_seurat <- function (seurat_object, cluster, cell_names, number_top) 
+{
+  if (!(requireNamespace(c("Seurat,Biobase"), quietly = TRUE))) {
+    stop("Package Seurat and Biobase needed for this function to work. Please install them: install.packages('Seurat') and BiocManager::install('Biobase')")
+  }
+  level <- levels(as.factor(cluster))
+  marker_cluster <- as.list(rep(0, length(level)))
+  marker_all <- de_seurat_cluster(seurat_object, cluster, cell_names, 0.05)
+  for (i in 1:length(level)) { 
+    marker_cluster[[i]] <- marker_all[[i]]
+    message(paste0("Cluster ", level[i]))
+  }
+  marker_all <- unlist(marker_cluster)
+  marker_all <- marker_all[Biobase::isUnique(marker_all)]
+  for (i in 1:length(level)) {
+    marker_cluster[[i]] <- marker_cluster[[i]][marker_cluster[[i]] %in% 
+    marker_all]
+    }
+    marker_to_see <- as.list(rep(0, length(level)))
+    marker_complete <- as.list(rep(0, length(level)))
+    for (i in 1:length(level)) {
+      if (length(marker_cluster[[i]]) >= number_top) {
+        marker_to_see[[i]] <- marker_cluster[[i]][1:number_top]
+        names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]]))
+        marker_complete[[i]] <- marker_cluster[[i]]
+        names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+      }
+      if ((length(marker_cluster[[i]]) > 0) & (length(marker_cluster[[i]]) < 
+            number_top)) {
+        marker_to_see[[i]] <- marker_cluster[[i]][1:length(marker_cluster[[i]])]
+            names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]])) 
+            marker_complete[[i]] <- marker_cluster[[i]]
+            names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+      }
+      
+      if (length(marker_cluster[[i]]) == 0) {
+        marker_to_see[[i]] <- NULL
+        marker_complete[[i]] <- NULL
+        
+      }
+      }
+    marker_top <- unlist(marker_to_see)
+    marker_top <- marker_top[marker_top != 0]
+    marker_complete <- unlist(marker_complete)
+    marker_complete <- marker_complete[marker_complete != 0]
+    marker_all_cluster_sing <- as.list(rep(0, length(level)))
+    for (i in 1:length(level)) {
+        if (sum(names(marker_top) == level[i]) > 0) {
+            marker_all_cluster_sing[[i]] <- paste(marker_top[names(marker_top) == 
+                level[i]], level[i], sep = "_")
+        }
+      
+      else {
+        
+      }
+      }
+    marker_all_cluster <- unlist(marker_all_cluster_sing)
+    marker_all_cluster <- marker_all_cluster[marker_all_cluster != 
+        0]
+    return(list(marker_top, marker_all_cluster, marker_complete))
+}
+```
+
+```{r}
+de_seurat_cluster <- function (seurat_object, cluster, names_cell, max_p_value) 
+{
+    level <- levels(as.factor(cluster))
+    final_markers <- vector("list", length(level))
+    for (i in 1:length(level)) {
+        markers <- Seurat::FindMarkers(seurat_object, ident.1 = names_cell[cluster == 
+            level[i]], ident.2 = names_cell[cluster != level[i]], 
+            only.pos = T)
+        markers_new <- markers[markers$p_val_adj <= max_p_value, 
+            ]
+        markers_new <- markers_new[order(markers_new$p_val_adj), 
+            ]
+        markers_final <- row.names(markers_new)
+        final_markers[[i]] <- markers_final
+    }
+    return(final_markers)
+}
+```
+
+```{r}
+cellTypesPerClusterBalloonPlot_small <- function (obj, cluster_vivo_factor, order_label_vivo, title_name, method = "Seurat",text_size = 0.4, 
+    label_size = 0.7, thresold = 0.5) 
+{
+  if (method == "Seurat"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+      }
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo))
+    if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
+      levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+      levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo,"Unassigned"))
+      }
+    cellTypes <- rep(levels_vitro[levels_vitro %in% unique(as.vector(obj@meta.data$predicted.id))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predicted.id))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predicted.id))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+      }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+      }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    }
+  if (method == "scibetR"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+      }
+    cellTypes <- rep(levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% unique(as.vector(obj@meta.data$predictions))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+      }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+      }
+    print(data)
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    }
+  if (method == "scmap"){
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels =  c(order_label_vivo,"unassigned"))
+    cellTypes <- rep(levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in% unique(as.vector(obj@meta.data$predictions))]) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * 
+      data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+      }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    }
+  if (method != "Seurat" & method != "scibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, scibetR or scmap")
+  }
+  }
+```
+
+```{r}
+cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_label_vivo, method = "Seurat", title_name, text_size = 0.4, label_size = 0.4, thresold = 0.5) 
+  {if (method == "Seurat"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+      }
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= 
+        thresold] <- "Unassigned"
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+    if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
+      levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+      levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, 
+            "Unassigned"))
+      }
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+      }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * 
+      data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+      }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    }
+  if (method == "scibetR"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+      }
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * 
+      data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters ==  cluster)])}
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    }
+  if (method == "scmap"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+      stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+      }
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, 
+            "unassigned"))
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+      nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+      }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+      data$nElements[which(data$clusters == cluster)] <- 100 * 
+      data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == cluster)])
+      }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    
+  }
+  if (method != "Seurat" & method != "scibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, ScibetR or scmap.")
+  }
+  
+  }
+```
+
+
+```{r}
+create_seurat_object <- function (raw_counts, project_name, resolution, neighbors, max_dimension, feature_genes = NULL) 
+{
+    if (!(requireNamespace("Seurat", quietly = TRUE))) {
+        stop("Package Seurat needed for this function to work. Please install it: install.packages('Seurat')")
+    }
+    nFeature_RNA <- NULL
+    seurat_object <- Seurat::CreateSeuratObject(counts = raw_counts, 
+        project = project_name)
+    seurat_object <- subset(seurat_object, subset = nFeature_RNA > 
+        0)
+    seurat_object <- Seurat::NormalizeData(seurat_object, verbose = FALSE)
+    seurat_object <- Seurat::FindVariableFeatures(seurat_object, 
+        selection.method = "vst", nfeatures = 2000)
+    seurat_object <- Seurat::ScaleData(seurat_object, verbose = FALSE)
+    seurat_object <- Seurat::RunPCA(seurat_object, npcs = max_dimension, 
+        verbose = FALSE, features = feature_genes)
+    seurat_object <- Seurat::RunUMAP(seurat_object, reduction = "pca", 
+        dims = 1:20, set.seed = 42)
+    seurat_object <- Seurat::FindNeighbors(seurat_object, reduction = "pca", 
+        dims = 1:max_dimension, k.param = neighbors)
+    seurat_object <- Seurat::FindClusters(seurat_object, resolution = resolution)
+    return(seurat_object)
+}
+
+```
+
+
+
+
+
+
+
+# SKIP
+# Function definiton
+
+```{r }
+plot_score_genes <- function(mouse_markers ,label_1, label_2, norm_vitro,norm_vivo, cluster_vitro,cluster_vivo, final_name, max_size =9, text_size=-9.5, title_name)
+  {
+  
+  mouse_markers <- mouse_markers[mouse_markers %in% row.names(norm_vitro)]
+
+
+  
+  all_markers_common_name <- final_name
+
+label_mouse <- c(rep(label_1,length(colnames(norm_vitro))),rep(label_2,length(colnames(norm_vivo))))
+mouse_norm_common=cbind(norm_vitro[mouse_markers,],norm_vivo[mouse_markers,])
+
+
+
+
+cluster_vitro_name <- paste(label_1, factor(cluster_vitro), sep="-")
+cluster_vivo_name <- paste(label_2, factor(cluster_vivo), sep="-")
+mouse_norm_common <- cbind(norm_vitro[mouse_markers, ], norm_vivo[mouse_markers, ])
+label_mouse <- c(cluster_vitro_name, cluster_vivo_name)
+out_2 <- plot_balons(mouse_norm_common, label_mouse,mouse_markers, length(mouse_markers), length(colnames(mouse_norm_common)), max_size = max_size,text_size = text_size, all_markers_common_name, keep_order = FALSE)
+out_2 <- out_2 + ggtitle(title_name)
+
+return(out_2)
+}
+```
+
+```{r }
+select_top_markers <- function(relevant_stages,cluster_mouse_published, norm_vivo, markers_small){
+marker_stages=rep(list(0),length(relevant_stages))
+for (i in 1:length(relevant_stages)){
+  white_black_7=white_black_marker(cluster_mouse_published[cluster_mouse_published%in%relevant_stages],relevant_stages[i],norm_vivo[,cluster_mouse_published%in%relevant_stages],markers_small,0.1)
+  marker_stages[[i]] <- names(white_black_7)[white_black_7]
+  if (sum(white_black_7) > 100){
+    marker_stages[[i]] <- marker_stages[[i]][1:100]
+    }
+  }
+marker_all <- unlist(marker_stages)
+return(list(marker_all,marker_stages))
+}
+```
+
+
+```{r }
+plot_score <- function(df, marker_stages, marker_stages_filter, selected_stages, name_vivo, y_name, fill_name, title_name){
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+p <- ggplot(df, aes(x = label, y = final_score, fill = label)) +
+  geom_bar(stat = "identity") + theme_minimal() + scale_fill_manual(values=c(MitoHEAR:::gg_color_hue(5),"blue"))
+p + theme( axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), 
+        axis.title.x = element_blank()) + ylab(y_name) + labs(fill=fill_name) +  ylim(c(0,1)) + ggtitle(paste0(title_name," (",sum(marker_stages_filter %in% marker_specific)," genes)",sep=" "))
+}
+```
+
+
+```{r }
+select_common_genes <- function(SCOPRO_output, marker_stages, selected_stages, name_vivo, cluster_vitro, name_vitro){
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+  common_genes <- SCOPRO_output[[3]][[index_vitro]][SCOPRO_output[[3]][[index_vitro]] %in% marker_specific]
+  return(common_genes)
+}
+
+```
+
+
+```{r }
+
+select_no_common_genes <- function(SCOPRO_output,marker_stages,selected_stages,name_vivo,cluster_vitro,name_vitro){
+  index_specific <- which(selected_stages%in%name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+no_common_genes <- SCOPRO_output[[4]][[index_vitro]][SCOPRO_output[[4]][[index_vitro]] %in% marker_specific]
+return(no_common_genes)
+}
+
+```
+
+
+
+```{r }
+
+
+SCOPRO <- function(norm_vitro, norm_vivo, cluster_vitro, cluster_vivo, name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, marker_stages, selected_stages){
+  mean_2_cell <- mean_stage(norm_vivo, cluster_vivo, name_vivo, marker_stages_filter)
+  connettivity_vivo <- find_connettivity(mean_2_cell, fold_change)
+  name_cluster <- levels(factor(cluster_vitro))
+  link_kept <- rep(list(0), length(name_cluster))
+  link_no_kept <- rep(list(0), length(name_cluster))
+  final_score <- rep(list(0), length(name_cluster))
+  for ( i in 1:length(name_cluster)){
+    mean_cluster <- mean_stage(norm_vitro,cluster_vitro,name_cluster[i], marker_stages_filter)
+    connettivity_vitro <- find_connettivity(mean_cluster,fold_change)
+    connettivity_vitro <- connettivity_vitro[row.names(connettivity_vivo),colnames(connettivity_vivo)]
+    index_specific <- which(selected_stages%in%name_vivo)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0){
+      stop(pasteo0("There are no markers for the stage: ",name_vivo))
+      }
+    result_comparison <- comparison_vivo_vitro(connettivity_vivo, connettivity_vitro, threshold,number_link, marker_specific)
+    link_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]]==1]
+    link_no_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]]!=1]
+    names(link_kept[[i]]) <- rep(name_cluster[i],length(link_kept[[i]]))
+    names(link_no_kept[[i]]) <- rep(name_cluster[i],length(link_no_kept[[i]]))
+    final_score[[i]] <- result_comparison[[3]]
+    names(final_score[[i]]) <- name_cluster[i]
+  }
+  common_link <- Reduce(intersect, link_kept)
+  no_common_link <- Reduce(intersect, link_no_kept)
+  return(list(common_link, no_common_link, link_kept, link_no_kept, final_score))
+}
+
+```
+
+
+```{r }
+plot_balons <- function(norm_counts, final_cluster, genes_to_plot, max_number, total_cells, max_size=5, text_size=7,label_final, keep_order=TRUE){
+ 
+  fattore <- factor(final_cluster,levels=unique(final_cluster))
+  if (keep_order == FALSE){
+  fattore <- factor(final_cluster)}
+livelli <- levels(factor(fattore))
+
+
+
+all_markers <- genes_to_plot
+
+all_markers <- lapply(all_markers, function(x) {x[x!=0]})
+
+
+all_markers_values <- rep(list(0),length(livelli))
+for ( i in 1:length(livelli)){
+  gene_values_0 <- apply(norm_counts[genes_to_plot,final_cluster==livelli[i]], 1, mean)
+  all_markers_values[[i]] <- gene_values_0
+}
+
+
+values <- rep(list(0),length(livelli))
+for ( i in 1:length(livelli)){
+  valore=apply(norm_counts[genes_to_plot,final_cluster==livelli[i]],1,function(x){sum(x>0.1)/length(x)})
+  values[[i]]=valore
+}
+
+cluster_label_all=rep(list(0),length(livelli))
+for ( i in 1:length(livelli)){
+  cluster_label_all[[i]] <- rep(livelli[i],length(genes_to_plot))
+}
+
+
+all_markers_plot <- genes_to_plot
+cluster_label_all <- unlist(cluster_label_all)
+values <- unlist(values)
+all_markers_values <- unlist(all_markers_values)
+balloon_melted <- data.frame(all_markers_plot,cluster_label_all,values,label_final)
+colnames(balloon_melted) <- c("genes_plot","cluster_label_all","values","label_all_final")
+
+p <- ggplot(balloon_melted, aes(x =factor(cluster_label_all,levels=unique(cluster_label_all)), y = factor(label_all_final,levels=(unique(label_final)))))
+p + geom_point( aes(size=values,colour=as.numeric(all_markers_values))) + theme(panel.background=element_blank(), panel.border = element_rect(colour = "blue", fill=NA, size=3))+scale_size_area(max_size=max_size)+ scale_colour_gradient(low = "grey", high = "brown", na.value = NA)+labs(colour="Mean",size="Value")+xlab("Cluster")+ylab("Markers")+theme(text = element_text(size=text_size),axis.text.x = element_text(angle=45,vjust=1,hjust=1),axis.title.x=element_blank())
+}
+```
+
+
+
+
+
+```{r }
+white_black_marker <- function(cluster_vivo, name_vivo, norm_vivo, marker_list, threshold = 0){
+  
+  white_black <- apply(norm_vivo[marker_list[names(marker_list) == name_vivo], ], 1, function(x){
+  mean_one <- median(x[cluster_vivo == name_vivo])
+  
+  mean_different <- rep(0,length(levels(factor(cluster_vivo[cluster_vivo != name_vivo]))))
+  for ( i in 1:length(levels(factor(cluster_vivo[cluster_vivo!=name_vivo])))){
+  mean_different[i] <- median(x[cluster_vivo == levels(factor(cluster_vivo[cluster_vivo != name_vivo]))[i]])}
+  if (mean_one > threshold & (sum(mean_different< threshold) == (length(levels(factor(cluster_vivo)))-1))){
+    return(TRUE)
+    }
+  else{
+    return(FALSE)
+  }
+  })
+  return(white_black)
+  
+
+}
+
+```
+
+```{r }
+filter_in_vitro <- function(norm_vitro, cluster_vitro, marker_all, fraction, threshold){
+livelli <- levels(factor(cluster_vitro))
+result_livelli <- rep(list(0),length(livelli))
+for ( i in 1:length(livelli)){
+  filter_gene <- apply(norm_vitro[marker_all, cluster_vitro == livelli[i]],1,function(x){
+    y <- x[x > threshold]
+    ratio <- length(y) / length(x)
+    if (ratio >= fraction){
+      return(TRUE)
+    }
+    else{return(FALSE)}
+    })
+  result_livelli[[i]] <- filter_gene
+}
+df <- data.frame(matrix(unlist(result_livelli), nrow=length(result_livelli), byrow=TRUE))
+final_logic <- apply(df,2, sum)
+hvg_vivo_final <- marker_all[final_logic > 0]
+return(hvg_vivo_final)
+}
+
+```
+
+```{r }
+mean_stage <- function(norm_counts, stage, name_stage, marker_stages_filter){
+  norm_counts <- norm_counts[,stage == name_stage]
+  mean_stage <- apply(norm_counts[marker_stages_filter, ], 1, mean)
+  mean_stage <- sort(mean_stage, decreasing = T)
+  return(mean_stage)
+}
+```
+
+```{r }
+find_connettivity <- function(mean_stage, fold_change){
+genes_fold_change <- rep(list(0), length(mean_stage))
+for (i in 1:length(mean_stage)){
+  if (mean_stage[i] <= 0.1){
+    ratio <- mean_stage[i]-mean_stage
+    genes_fold_change[[i]][ratio == 0.1] <- 1
+    genes_fold_change[[i]][ratio < 0.1] <- 0
+    
+  }
+  else{
+    ratio <- mean_stage[i] / mean_stage
+  genes_fold_change[[i]][ratio <= fold_change] <- 0
+  genes_fold_change[[i]][ratio > fold_change] <- 1
+  }
+}
+
+connettivity <- matrix(unlist(genes_fold_change), byrow=TRUE, nrow=length(genes_fold_change) )
+row.names(connettivity) <- names(mean_stage)
+colnames(connettivity) <- names(mean_stage)
+return(connettivity)}
+```
+
+```{r }
+comparison_vivo_vitro <- function(connettivity_vivo, connettivity_vitro, threshold, number_link, marker_specific){
+frac <- rep(0,length(row.names(connettivity_vivo)))
+for ( i in 1:length(row.names(connettivity_vivo))){
+  index_vivo <- which(connettivity_vivo[i,]==1)
+  index_vitro <- which(connettivity_vitro[i,]==1)
+  if (length(index_vivo) > number_link){
+    frac[i] <- length(intersect(index_vitro, index_vivo))/length(union(index_vitro, index_vivo))
+  }
+  else{frac[i]="Excluded"}
+  }
+
+names(frac) <- row.names(connettivity_vivo)
+frac_1 <- frac[frac != "Excluded"]
+frac_1 <- sort(frac_1,decreasing = TRUE)
+frac_final <- frac_1
+frac_final[frac_1 > threshold] <- 1
+frac_final[frac_1 <= threshold] <- 0
+frac_specific <- sum(frac_1[names(frac_1)%in%marker_specific]>threshold)/length(frac_1[names(frac_1)%in%marker_specific])
+return(list(frac_1,frac_final,frac_specific))
+}
+
+```
+
+
+
+# Mouse in vitro dataset (ESCs)
+
+```{r }
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/10x_data/Processed_data")
+
+load("ips_combined_old.Rda")
+
+load("es_combined_old.Rda")
+
+
+
+norm_es_vitro=as.matrix(GetAssayData(es_combined_old, slot = "data",assay="RNA"))
+cluster_es_vitro=as.vector(es_combined_old$integrated_snn_res.0.1)
+
+norm_ips_vitro=as.matrix(GetAssayData(ips_combined_old, slot = "data",assay="RNA"))
+cluster_ips_vitro=as.vector(ips_combined_old$integrated_snn_res.0.1)
+
+
+
+```
+
+
+# Mouse in vitro dataset (ESCs from Ane day 0h)
+
+```{r }
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mayra_project")
+load('mayra_dati_raw_0.Rda')
+#mayra_seurat_0=cluster_analysis_integrate_rare(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
+
+mayra_seurat_0 = create_seurat_object(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
+
+norm_counts_ane_0=as.matrix(GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
+knn_matrix_ane_0=as.matrix(mayra_seurat_0@graphs$RNA_nn)
+cordinate_umap_0=as.data.frame(Embeddings(mayra_seurat_0, reduction = "umap")[, 1:2])
+cluster_ane_0=as.vector(mayra_seurat_0$RNA_snn_res.0.1)
+```
+
+# Skip 
+```{r }
+
+cluster_es_vitro_small_0=which(cluster_ane_0==0)[1:10]
+cluster_es_vitro_small_1=which(cluster_ane_0==1)[1:10]
+cluster_es_vitro_small_2=which(cluster_ane_0==2)
+
+index_es_vitro_small=c(cluster_es_vitro_small_0,cluster_es_vitro_small_1,cluster_es_vitro_small_2)
+
+cluster_ane_0_small=cluster_ane_0[index_es_vitro_small]
+norm_counts_ane_0_small=norm_counts_ane_0[,index_es_vitro_small]
+
+#save(cluster_ane_0,file="cluster_ane_0.Rda")
+#save(norm_es_vitro_small,file="norm_es_vitro_small.Rda")
+```
+# Stop skip
+
+
+```{r }
+#plot_umap(cordinate_umap_0,mayra_seurat_0$RNA_snn_res.0.1)
+```
+
+# Mouse in vivo dataset 
+```{r }
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/10x_data/Processed_data")
+load(file="seurat_genes_published_mouse.Rda")
+
+#raw_vivo=as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "counts",assay="RNA"))
+
+#seurat_genes_published_mouse = create_seurat_object(raw_vivo,"Mayra_data_0",0.2,5,20)
+
+norm_vivo=as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "data",assay="RNA"))
+
+```
+
+# SCOPRO
+
+```{r}
+DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
+
+
+selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small=plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+norm_vivo_small=as.matrix(GetAssayData(seurat_genes_published_mouse_small, slot = "data",assay="RNA"))
+
+
+
+```
+
+
+
+```{r }
+
+
+#DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+#cluster_mouse_published=as.vector(seurat_genes_published_mouse$stim)
+
+
+#selected_stages=c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+#DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+
+#markers_first_ESC_small=markers_cluster_seurat(seurat_genes_published_mouse[,cluster_mouse_published%in%selected_stages],cluster_mouse_published[cluster_mouse_published%in%selected_stages],names(seurat_genes_published_mouse$RNA_snn_res.0.2)[cluster_mouse_published%in%selected_stages],10)
+
+markers_first_ESC_small=markers_cluster_seurat(seurat_genes_published_mouse_small,cluster_mouse_published_small,names(seurat_genes_published_mouse_small$RNA_snn_res.0.2),10)
+
+```
+
+```{r }
+cluster_vitro=cluster_ane_0
+norm_vitro=norm_counts_ane_0
+```
+
+```{r }
+
+
+markers_mouse=as.vector(markers_first_ESC_small[[3]])
+stages_markers=names(markers_first_ESC_small[[3]])
+
+## Keeping only the genes in common between in vitro and in vivo datasets
+stages_markers=stages_markers[markers_mouse%in%row.names(norm_vitro)]
+
+markers_small=markers_mouse[markers_mouse%in%row.names(norm_vitro)]
+names(markers_small)=stages_markers
+```
+
+
+
+
+
+```{r }
+
+#relevant_stages=levels(factor(selected_stages))
+
+marker_result=select_top_markers(selected_stages,cluster_mouse_published,norm_vivo,markers_small)
+marker_all=marker_result[[1]]
+marker_stages=marker_result[[2]]
+
+```
+
+
+# Top markers for late 2 cells stage
+
+```{r}
+
+p=list()
+for(i in marker_stages[[1]][1:2]){
+  q <- plot_boxplot(norm_vivo_small,i, cluster_mouse_published_small, selected_stages, i ,"Stage", "Cluster", "Log norm")
+  p <- list(p,q)
+}
+p
+
+```
+
+## Run SCOPRO 
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_vitro,cluster_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+#selected_stages = relevant_stages
+
+analysis_2cell=SCOPRO(norm_vitro,norm_vivo_small,cluster_vitro,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+
+plot_score(analysis_2cell,marker_stages,marker_stages_filter,selected_stages,"Late_2_cell","Final score","Cluster","Late_2_cell")
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+common_genes=select_common_genes(analysis_2cell,marker_stages,selected_stages,"Late_2_cell",cluster_vitro,"2")
+no_common_genes=select_no_common_genes(analysis_2cell,marker_stages,selected_stages,"Late_2_cell",cluster_vitro,"2")
+
+
+
+
+all_genes=c(no_common_genes[1:4],common_genes[1:10])
+all_genes_label=c(paste0(no_common_genes[1:4],"-no_conserved"),paste0(common_genes[1:10],"-conserved"))
+
+
+
+
+mouse_plot=plot_score_genes(all_genes,"Mouse ESC","Mouse vitro", norm_vitro,norm_vivo_small[,cluster_mouse_published_small=="Late_2_cell"],cluster_vitro,cluster_mouse_published_small[cluster_mouse_published_small=="Late_2_cell"],all_genes_label,7,10,"Late_2_cell")
+
+mouse_plot
+
+
+
+
+
+```
+
+
+
+
+```{r}
+detect_expressed_genes <- function(norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0){
+  index_specific <- which(selected_stages %in% name_vivo)
+        marker_specific <- marker_stages[[index_specific]]
+        if (length(marker_specific) == 0) {
+            stop(paste0("There are no markers for the stage: ", 
+                name_vivo))
+        }
+        
+  marker_specific <- marker_specific[marker_specific %in% row.names(norm_vitro)]
+  expressed_genes <- apply(norm_vitro[marker_specific,],2,function(x){
+    number_genes <- sum(x > threshold)
+    return(number_genes)
+  })
+  return(expressed_genes)
+}
+```
+
+```{r}
+
+detect_names_genes <- function(norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0){
+  index_specific <- which(selected_stages %in% name_vivo)
+        marker_specific <- marker_stages[[index_specific]]
+        if (length(marker_specific) == 0) {
+            stop(paste0("There are no markers for the stage: ", 
+                name_vivo))
+        }
+        
+  marker_specific <- marker_specific[marker_specific %in% row.names(norm_vitro)]
+  
+  name_genes <- apply(norm_vitro[marker_specific,],2,function(x){
+    index_genes <- which(x > threshold)
+    names <- row.names(norm_vitro[marker_specific,])[index_genes]
+    return(names)
+  })
+  return(name_genes)
+}
+
+```
+
+```{r}
+names_marker_genes = function (list_intersect, genes_sort, max_number = 5) 
+{
+    text <- rep(0, length(list_intersect))
+    for (i in 1:length(list_intersect)) {
+        if (length(list_intersect[[i]]) == 0) {
+            marker_genes <- "No markers expressed"
+            text[i] <- "No markers expressed"
+        }
+        else {
+            marker_genes <- genes_sort[which(genes_sort %in% 
+                list_intersect[[i]])]
+            max_genes <- min(max_number, length(marker_genes))
+            if (max_genes < max_number) {
+                warning("max_number bigger than length of marker_genes. Set max_number = length(marker_genes) ")
+            }
+            marker_genes <- marker_genes[1:max_genes]
+            text[i] <- paste(marker_genes, collapse = "-")
+        }
+    }
+    return(text)
+}
+```
+
+```{r}
+plot_in_vivo_markers <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, name_title){
+  if (sum(!unlist(lapply(list(c("grDevices","gplots")),requireNamespace, quietly = TRUE)))>0) {
+    stop("Package gplots and grDevices needed for this function to work. Please install them: install.packages('gplots') and install.packages('grDevices')")
+  }
+  rank_intersect = detect_expressed_genes(norm_vitro, marker_stages, selected_stages, name_vivo, 0)
+  ramp <- grDevices::colorRamp(c("white", "darkorange3"))
+  length_ramp <- length(unique(rank_intersect))
+  ramp.list <- grDevices::rgb( ramp(seq(0, 1, length = length_ramp)), max = 255)
+  index_color=round(length(ramp.list)/2,0)
+  breaks <- seq(0,1,length.out=1000)
+  gradient1 <- gplots::colorpanel( sum( breaks[-1]<= as.numeric(quantile(breaks,0.50))), "#FFFFFF",ramp.list[index_color])
+  gradient2 <- gplots::colorpanel( sum( breaks[-1] > as.numeric(quantile(breaks,0.50)) ), ramp.list[index_color], "#CD6600" )
+  hm.colors_esc <- c(gradient1,gradient2)
+  index_sort <- order(rank_intersect)
+  row.names(coordinate_umap) <- colnames(norm_vitro)
+  coordinate_umap <- coordinate_umap[colnames(norm_vitro)[index_sort], ]
+  rank_intersect <- sort(rank_intersect)
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[, 
+        1], coordinate_umap[, 2])) + ggplot2::geom_point(ggplot2::aes(colour = rank_intersect), size = 1) + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::ggtitle(name_title) + ggplot2::labs(col= paste0("Number of markers")) + ggplot2::theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_blank(), axis.text = element_blank(), text = element_text(size = 14, family = "Helvetica")) + ggplot2::scale_colour_gradientn(colors = hm.colors_esc)
+  return((umap_plot))
+}
+```
+
+
+
+
+```{r}
+plot_in_vivo_markers_interactive <- function (coordinate_umap, norm_vitro, marker_stages, selected_stages, name_vivo, threshold = 0, max_number = 5, min_x = NULL, max_x = NULL, min_y = NULL, max_y = NULL) 
+  {
+  rank_intersect <- detect_expressed_genes(norm_vitro, marker_stages, selected_stages, name_vivo, threshold)
+  ramp <- grDevices::colorRamp(c("white", "darkorange3"))
+  length_ramp <- length(unique(rank_intersect))
+  ramp.list <- grDevices::rgb( ramp(seq(0, 1, length = length_ramp)), max = 255)
+  index_sort <- order(rank_intersect)
+  list_intersect <- detect_names_genes(norm_vitro, marker_stages, selected_stages, name_vivo, threshold)
+  index_specific <- which(selected_stages %in% name_vivo)
+  marker_specific <- marker_stages[[index_specific]]
+  marker_specific <- marker_specific[marker_specific %in% row.names(norm_vitro)]
+  text <- names_marker_genes(list_intersect, marker_specific, max_number)
+  text <- text[index_sort]
+  row.names(coordinate_umap) <- colnames(norm_vitro)
+  coordinate_umap <- coordinate_umap[colnames(norm_vitro)[index_sort], ]
+  rank_intersect <- sort(rank_intersect)
+  if (!requireNamespace("plotly", quietly = TRUE)) {
+        stop("Package plotly needed for interactive == TRUE. Please install it: install.packages('plotly')")
+    }
+    colnames(coordinate_umap) <- c("UMAP_1", "UMAP_2")
+    fig <- plotly::plot_ly(data = coordinate_umap, x = ~UMAP_1, 
+        y = ~UMAP_2, color = ~rank_intersect, type = "scatter", 
+        mode = "markers", marker = list(size = 5, width = 2, 
+            line = list(color = "black", width = 0.5)), text = ~text, 
+        hoverinfo = "text", colors = ramp.list)
+    if (!is.null(min_x)) {
+        fig <- fig %>% plotly::layout(xaxis = list(range = c(min_x, 
+            max_x)), yaxis = list(range = c(min_y, max_y))) %>% 
+            plotly::layout(plot_bgcolor = "rgb(254, 247, 234)") %>% 
+            plotly::layout(paper_bgcolor = "rgb(254, 247, 234)")
+    }
+    return(fig)
+}
+```
+
+```{r}
+plot_in_vivo_markers(cordinate_umap_0, norm_vitro, marker_stages, selected_stages, "Late_2_cell", 0, "Late 2 cells markers")
+```
+```{r}
+plot_in_vivo_markers(cordinate_umap_0, norm_vitro, marker_stages, selected_stages, "epiblast_4.5", 0, "epiblast_4.5 markers")
+```
+
+
+```{r}
+plot_in_vivo_markers_interactive(cordinate_umap_0, norm_vitro, marker_stages, selected_stages, "Late_2_cell", threshold = 0, max_number = 5)
+```
+
+```{r }
+find_median_cluster <- function(cluster_vivo, selected_stages, norm_vivo, genes){
+number_cluster <- selected_stages
+median_es <- rep(list(0),length(number_cluster))
+for (i in 1:length(number_cluster)){
+median_es[[i]] <- apply(norm_vivo[genes, cluster_vivo == number_cluster[i]],1,'median')
+}
+return(median_es)}
+```
+
+```{r }
+find_mean_cluster <- function(cluster_vivo, selected_stages, norm_vivo, genes){
+number_cluster <- selected_stages
+median_es <- rep(list(0),length(number_cluster))
+for (i in 1:length(number_cluster)){
+median_es[[i]] <- apply(norm_vivo[genes, cluster_vivo == number_cluster[i]],1,'mean')
+}
+return(median_es)}
+```
+
+```{r }
+norm_vivo= norm_vivo_small
+cluster_vivo = cluster_mouse_published_small
+max_number =10
+plot_heatmap_vivo <- function(norm_vivo, cluster_vivo, marker_stages, selected_stages, max_number = 10, name_title) {
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+      }
+  }
+  marker_stages_top = rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] = marker_stages}
+    }
+  marker_all = unlist(marker_stages_top)
+  median_es <- find_median_cluster(cluster_vivo, norm_vivo, marker_all)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_all
+  
+  gplots::heatmap.2(median_es_matrix, scale = "none", col = gplots::bluered(100), trace = "none", density.info = "none",cexRow=1,cexCol = 1, Rowv = FALSE)
+  
+  
+}
+```
+```{r }
+gg_color_hue = function (n) 
+{
+    hues <- seq(15, 375, length = n + 1)
+    hcl(h = hues, l = 65, c = 100)[1:n]
+}
+```
+
+```{r }
+for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+      }
+  }
+  marker_stages_top = rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] = marker_stages}
+    }
+  marker_all = unlist(marker_stages_top)
+  median_es <- find_median_cluster(cluster_vivo, norm_vivo, marker_all)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_all
+```
+ 
+ 
+```{r }
+
+heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  
+  
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+      }
+  }
+  marker_stages_top <- rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] <- marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] <- marker_stages[[i]]}
+    }
+  marker_all <- unlist(marker_stages_top)
+  cluster_vivo <- factor(cluster_vivo, levels = selected_stages)
+  index_list <- rep(list(0), length(levels(cluster_vivo)))
+  for ( i in 1:length(levels(cluster_vivo))){
+    index_list[[i]] <- which(cluster_vivo == levels(cluster_vivo)[i])
+    
+  }
+  
+  index_all <- unlist(index_list)
+  
+  
+  heatdata <- norm_vivo[marker_all, index_all]
+  cluster_vivo <- cluster_vivo[index_all]
+  cluster_unique <- unique(cluster_vivo)
+  row.names(heatdata) <- marker_all
+  
+  if(is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+  color_cluster <- rep(0,length(unique(my.cluster_vivo)))
+  for (i in 1:length(color_cluster) ){
+    color_cluster[i] <- colore_vector[i]
+    }
+  names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vivo dataset", length(cluster_vivo))
+  data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+  ComplexHeatmap::draw(ht21)
+  }
+
+```
+
+
+```{r }
+
+heatmap_markers_vivo_median_profile <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
+  
+  
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+      }
+  }
+  marker_stages_top <- rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    if (length(marker_stages[[i]]) >= max_number) {
+      marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
+    }
+    else {marker_stages_top[[i]] = marker_stages[[i]]}
+    }
+  marker_all <- unlist(marker_stages_top)
+  
+  
+  median_es <- find_median_cluster(cluster_vivo, selected_stages, norm_vivo, marker_all)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_all
+  
+  heatdata <- median_es_matrix
+  
+  cluster_vivo <- selected_stages
+  cluster_unique=unique(cluster_vivo)
+  row.names(heatdata) <- marker_all
+  
+  if(is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vivo)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+  color_cluster=rep(0,length(unique(my.cluster_vivo)))
+  for (i in 1:length(color_cluster) ){
+    color_cluster[i] <- colore_vector[i]
+    }
+  names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vivo dataset", length(cluster_vivo))
+  data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+  ComplexHeatmap::draw(ht21)
+  }
+
+```
+
+
+```{r }
+
+heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  
+  if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+    stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+  }
+  marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+  
+  cluster_vitro <- factor(cluster_vitro)
+  index_list = rep(list(0), length(levels(cluster_vitro)))
+  for ( i in 1:length(levels(cluster_vitro))){
+    index_list[[i]] = which(cluster_vitro == levels(cluster_vitro)[i])
+    
+  }
+  
+  index_all <- unlist(index_list)
+  
+  
+  
+  heatdata <- norm_vitro[marker_plot, index_all]
+  cluster_vitro <- cluster_vitro[index_all]
+  cluster_unique <- unique(cluster_vitro)
+  row.names(heatdata) <- marker_plot
+  
+  if(is.null(color_vector)){
+    color_cluster=rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster) <- as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+  color_cluster <- rep(0,length(unique(my.cluster_vitro)))
+  for (i in 1:length(color_cluster) ){
+    color_cluster[i] <- colore_vector[i]
+    }
+  names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vitro dataset", length(cluster_vitro))
+  data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+  ComplexHeatmap::draw(ht21)
+  }
+
+```
+
+```{r }
+
+heatmap_markers_vitro_mean_profile <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
+  if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+    stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+  }
+  marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+  
+  
+  selected_stages <- levels(factor(cluster_vitro))
+   median_es <- find_mean_cluster(cluster_vitro, selected_stages, norm_vitro, marker_plot)
+  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+  colnames(median_es_matrix) <- selected_stages
+  row.names(median_es_matrix) <- marker_plot
+  
+  heatdata <- median_es_matrix
+  
+  cluster_vitro <- selected_stages
+  cluster_unique <- unique(cluster_vitro)
+  
+  
+  if(is.null(color_vector)){
+    color_cluster <- rep(0,length(unique(cluster_vitro)))
+    for (i in 1:length(color_cluster) ){
+      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+    }
+    names(color_cluster)=as.character(cluster_unique)}
+  if(!is.null(color_vector)){
+  color_cluster=rep(0,length(unique(my.cluster_vitro)))
+  for (i in 1:length(color_cluster) ){
+    color_cluster[i] <- colore_vector[i]
+    }
+  names(color_cluster) <- as.character(cluster_unique)
+  }
+  color_condition <- "green"
+  batch <- rep("In vitro dataset", length(cluster_vitro))
+  data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "green 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+  ComplexHeatmap::draw(ht21)
+  }
+
+```
+
+```{r }
+heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_vivo_small, color_vector = NULL)
+```
+
+```{r }
+heatmap_markers_vivo_median_profile(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_vivo_small, color_vector = NULL)
+```
+
+```{r }
+
+heatmap_markers_vitro(norm_vitro,common_genes, cluster_vitro, color_vector = NULL)
+```
+
+```{r }
+
+heatmap_markers_vitro_mean_profile(norm_vitro,common_genes, cluster_vitro, color_vector = NULL)
+```
+
+```{r}
+plot_umap <- function(coordinate_umap, cluster){
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[, 1], coordinate_umap[, 2] )) +
+    ggplot2::geom_point(ggplot2::aes(colour = as.factor(cluster))) + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::labs(col = "Cluster")
+  return(list(umap_plot))
+}
+```
+
+
+
+```{r}
+gg_color_hue <- function(n) {
+  hues <- seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+```
+
+```{r}
+plot_gene <- function(norm_matrix, coordinate_umap, gene_id, title_name){
+
+
+  gene_expr <- as.vector(norm_matrix[gene_id, ])
+  index_sort <- order(gene_expr)
+  row.names(coordinate_umap) <- colnames(norm_matrix)
+  coordinate_umap <- coordinate_umap[colnames(norm_matrix)[index_sort], ]
+  gene_expr <- sort(gene_expr)
+  umap_plot <- ggplot2::ggplot(coordinate_umap, ggplot2::aes(coordinate_umap[, 1], coordinate_umap[, 2] )) +
+    ggplot2::geom_point(ggplot2::aes(colour = (gene_expr)))  + ggplot2::xlab("UMAP 1") + ggplot2::ylab("UMAP 2") + ggplot2::labs(col = "Log norm counts")+
+    ggplot2::scale_colour_gradient(low = "white", high = "blue") +
+    ggplot2::ggtitle(title_name)
+  return((umap_plot))
+}
+```
+
+
+```{r }
+
+plot_qc_cluster <- function(seurat_object,cluster_vitro,mit_prefix,rib_prefix_1,rib_prefix_2){
+
+raw_counts <- (Seurat::GetAssayData(seurat_object, slot = "counts",assay="RNA"))
+sum_umi <- apply(raw_counts,2,sum)
+sum_geni <- apply(raw_counts,2,function(x){
+  x <- x[x!=0]
+  return(length(x))
+})
+
+
+frac_mito <- apply(raw_counts,2,function(x){
+  return(sum(x[grep(mit_prefix,row.names(raw_counts))])/sum(x))
+  
+  
+  
+})
+
+
+frac_ribo <- apply(raw_counts,2,function(x){
+  frac_ribo_s <- x[grep(rib_prefix_1, row.names(raw_counts))]
+  frac_ribo_l <- x[grep(rib_prefix_2, row.names(raw_counts))]
+  frac_ribo_all <- c(frac_ribo_s, frac_ribo_l)
+  return(sum(frac_ribo_all) / sum(x))
+  })
+
+
+cluster_vitro <- as.factor(cluster_vitro)
+
+data_plot <- data.frame(as.numeric(frac_mito), as.numeric(sum_geni), as.numeric(sum_umi), as.numeric(frac_ribo),cluster_vitro)
+
+
+plot_1 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=frac_mito,fill=cluster_vitro)) + ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("frac mito reads") + ggplot2::ggtitle("Frac mito reads")
+
+
+plot_2 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=sum_umi,fill=cluster_vitro)) + 
+  ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("UMI counts") + ggplot2::ggtitle("UMI counts")
+
+plot_3 <- ggplot2::ggplot(data_plot, aes(x=cluster_vitro, y=sum_geni,fill=cluster_vitro)) + 
+  ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("Number of genes") + ggplot2::labs(color="Cluster") + ggplot2::ggtitle("Number of genes")
+
+plot_4 <- ggplot2::ggplot(data_plot, ggplot2::aes(x=cluster_vitro, y=frac_ribo, fill=cluster_vitro)) + 
+  ggplot2::geom_boxplot() + ggplot2::xlab("clusters") + ggplot2::ylab("Frac ribo reads") + ggplot2::labs(color="Cluster") + ggplot2::ggtitle("Frac ribo reads")
+return (list(plot_1, plot_2, plot_3, plot_4))
+}
+
+```
+
+```{r }
+plot_qc_cluster(mayra_seurat_0, cluster_vitro,"mt-","Rps","Rpl")
+
+```
+
+
+## To change
+```{r}
+
+barplot_cell_cycle=function(cell_cycle,cluster,title,fraction=TRUE){
+dfForPlot <- data.frame(Phases =cell_cycle
+                                ,clu =cluster)
+
+if(fraction==TRUE){
+pnm <-ggplot(dfForPlot, aes(y=cell_cycle,x=cluster))+geom_bar( aes(fill = cell_cycle,y = (..count..)/sum(..count..)),position="fill")+ ggtitle(title)+ylab("Fraction of cells")+xlab("Cluster")+labs(fill="Spatial origin")+theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1,size=6)) 
+pnm}
+
+if(fraction!=TRUE){
+  pnm <-ggplot(dfForPlot, aes(y=cell_cycle,x=cluster))+geom_bar( aes(fill = cell_cycle,y = (..count..),position="fill"))+ ggtitle(title)+ylab("Number of cells")+xlab("Cluster")+labs(fill="Spatial origin")+theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1,size=6)) 
+pnm
+
+
+}
+return(list(pnm))}
+```
+
+```{r }
+
+
+df=data.frame(original_sub[select_endo],origin_space[select_endo])
+colnames(df)=c("cluster","origin_space")
+
+p=barplot_cell_cycle(df[,2],df[,1],"Endoderm - spatial origin",fraction = T)
+
+p[[1]]+theme(text = element_text(size=14),axis.text.x = element_text(size=14,angle = 45, vjust = 1, hjust = 1))
+
+```
+
+
+```{r }
+
+
+
+
+
+
+```
+
+
+# Run SCOPRO with single cell mode
+
+```{r }
+
+
+
+analysis_2cell_sc=SCOPRO_single_cell(norm_vitro,norm_vivo_small,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+#png("/Users/gabriele.lubatti/Downloads/scopro_no_late2_epi_4_5.png")
+
+plot_score_sc(analysis_2cell_sc,cluster_vitro,marker_stages,marker_stages_filter,selected_stages,"Late_2_cell","Final score","Cluster","Late_2_cell")
+
+#dev.off()
+
+```
+```{r}
+
+
+common_genes_sc=select_common_genes_sc(analysis_2cell_sc,marker_stages,selected_stages,"Late_2_cell",cluster_es_vitro,"2", threshold = 0.4)
+
+no_common_genes_sc=select_no_common_genes_sc(analysis_2cell,marker_stages,selected_stages,"Late_2_cell",cluster_es_vitro,"2")
+
+
+
+
+all_genes=c(no_common_genes_sc[1:4],common_genes_sc[1:10])
+all_genes_label=c(paste0(no_common_genes_sc[1:4],"-no_conserved"),paste0(common_genes_sc[1:10],"-conserved"))
+
+
+
+
+mouse_plot=plot_score_genes(all_genes,"Mouse ESC","Mouse vitro", norm_es_vitro,norm_vivo[,cluster_mouse_published=="Late_2_cell"],cluster_es_vitro,cluster_mouse_published[cluster_mouse_published=="Late_2_cell"],all_genes_label,7,10,"Late_2_cell")
+
+mouse_plot
+
+
+
+
+
+```
+
+# Run projection with published method 
+
+# Seurat
+```{r}
+
+mayra_seurat_0_seurat <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+
+
+ 
+ 
+ 
+
+ cluster_vitro_factor=factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vitro = c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+ #png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_seurat, cluster_vitro_factor, order_label_vitro,  title_name  = "Projection Mouse ESC on mouse embryos ", method = "Seurat" ,1,1,0.1)
+ #dev.off()
+ 
+cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_seurat, cluster_vitro_factor,order_label_vitro,  title_name = "Projection Mouse ESC on mouse embryos ", method = "Seurat", 1,1,0.1)
+ 
+ 
+ 
+ 
+```
+
+
+# scibetR
+
+```{r}
+mayra_seurat_0_scibet = findCellTypesScibet(mayra_seurat_0, seurat_genes_published_mouse_small, cluster_mouse_rename_small)
+```
+
+```{r}
+
+
+cluster_vivo_factor=factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vivo = c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_scibet, cluster_vivo_factor, order_label_vivo,  title_name  = "Projection Mouse ESC on mouse embryos " , method = "scibetR", 1,1,0.1)
+
+cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_scibet, cluster_vivo_factor,order_label_vivo, title_name = "Projection Mouse ESC on mouse embryos ", method = "scibetR", 1,1,0.1)
+
+
+```
+
+
+# scmap
+
+```{r}
+
+mayra_seurat_0_scmap <- findCellTypes_scmap(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, namedLabels = cluster_mouse_rename_small, n_features = 500,threshold = 0.7)
+```
+
+
+```{r}
+ 
+
+# png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_scmap, cluster_vitro_factor, order_label_vitro, method = "scmap", title_name  = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+ #dev.off()
+ 
+ cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_scmap, cluster_vitro_factor,order_label_vitro, method = "scmap",  title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.8)
+ 
+ 
+ 
+ 
+```
+
+
+# SCOPRO without late 2 cells 
+
+
+```{r}
+DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
+
+
+selected_stages = c("epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small=plyr::revalue(cluster_mouse_published_small, c("epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+norm_vivo_small=as.matrix(GetAssayData(seurat_genes_published_mouse_small, slot = "data",assay="RNA"))
+
+
+
+```
+
+
+
+```{r }
+
+
+#DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+#cluster_mouse_published=as.vector(seurat_genes_published_mouse$stim)
+
+
+#selected_stages=c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+#DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+
+#markers_first_ESC_small=markers_cluster_seurat(seurat_genes_published_mouse[,cluster_mouse_published%in%selected_stages],cluster_mouse_published[cluster_mouse_published%in%selected_stages],names(seurat_genes_published_mouse$RNA_snn_res.0.2)[cluster_mouse_published%in%selected_stages],10)
+
+markers_first_ESC_small=markers_cluster_seurat(seurat_genes_published_mouse_small,cluster_mouse_published_small,names(seurat_genes_published_mouse_small$RNA_snn_res.0.2),10)
+
+```
+
+```{r }
+cluster_vitro=cluster_ane_0
+norm_vitro=norm_counts_ane_0
+```
+
+```{r }
+
+
+markers_mouse=as.vector(markers_first_ESC_small[[3]])
+stages_markers=names(markers_first_ESC_small[[3]])
+
+## Keeping only the genes in common between in vitro and in vivo datasets
+stages_markers=stages_markers[markers_mouse%in%row.names(norm_vitro)]
+
+markers_small=markers_mouse[markers_mouse%in%row.names(norm_vitro)]
+names(markers_small)=stages_markers
+```
+
+
+
+
+
+```{r }
+
+#relevant_stages=levels(factor(selected_stages))
+
+marker_result=select_top_markers(selected_stages,cluster_mouse_published,norm_vivo,markers_small)
+marker_all=marker_result[[1]]
+marker_stages=marker_result[[2]]
+
+```
+
+
+
+
+# Run SCOPRO 
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_vitro,cluster_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+#selected_stages = relevant_stages
+
+analysis_epi_4_5=SCOPRO(norm_vitro,norm_vivo_small,cluster_vitro,cluster_mouse_published_small,"epiblast_4.5",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+
+plot_score(analysis_epi_4_5,marker_stages,marker_stages_filter,selected_stages,"epiblast_4.5","Final score","Cluster","epiblast_4.5")
+
+
+```
+
+
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_vitro,cluster_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+#selected_stages = relevant_stages
+
+analysis_epi_5_5=SCOPRO(norm_vitro,norm_vivo_small,cluster_vitro,cluster_mouse_published_small,"epiblast_5.5",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+
+plot_score(analysis_epi_5_5,marker_stages,marker_stages_filter,selected_stages,"epiblast_5.5","Final score","Cluster","epiblast_5.5")
+
+
+```
+
+
+
+# Run projection with published method 
+
+# Seurat
+```{r}
+
+mayra_seurat_0_seurat <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+
+
+ 
+ 
+ 
+
+ cluster_vitro_factor=factor(cluster_mouse_rename_small,levels=c("epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vitro = c("epi_4.5","epi_5.5","epi_6.5")
+
+ #png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_seurat, cluster_vitro_factor, order_label_vitro,  title_name  = "Projection Mouse ESC on mouse embryos ", method = "Seurat" ,1,1,0.1)
+ #dev.off()
+ 
+cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_seurat, cluster_vitro_factor,order_label_vitro,  title_name = "Projection Mouse ESC on mouse embryos ", method = "Seurat", 1,1,0.1)
+ 
+ 
+ 
+ 
+```
+
+
+
+
+## From now untill the end of the script not useful any more
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+cluster_vivo_small = cluster_mouse_published[cluster_mouse_published %in% relevant_stages]
+norm_vivo_small = norm_vivo[,cluster_mouse_published %in% relevant_stages]
+order_label_vivo = relevant_stages=levels(factor(relevant_stages))
+
+
+p=list()
+for(i in marker_stages[[1]][1:2]){
+  q <- plot_boxplot(norm_vivo_small,i, cluster_vivo, order_label_vivo, i ,"Stage", "Cluster", "Log norm")
+  p <- list(p,q)
+}
+p
+
+```
+
+
+
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+selected_stages = relevant_stages
+
+analysis_2cell=SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"epiblast_4.5",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+png("/Users/gabriele.lubatti/Downloads/scopro_no_late2_epi_4_5.png")
+plot_score(analysis_2cell,marker_stages,marker_stages_filter,selected_stages,"epiblast_4.5","Final score","Cluster","epiblast_4.5")
+dev.off()
+
+```
+
+
+```{r }
+SCOPRO_single_cell = function (norm_vitro, norm_vivo, cluster_vivo, 
+    name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1, 
+    fold_change = 3, threshold_fold_change = 0.1, marker_stages, 
+    selected_stages) 
+{
+    if (sum(selected_stages %in% name_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+    if (sum(cluster_vivo %in% name_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector cluster_vivo")
+    }
+    if (sum(selected_stages %in% cluster_vivo) == 0) {
+        stop("name_vivo must be one the stages present in the vector cluster_vivo")
+    }
+    if (length(marker_stages_filter) == 0) {
+        stop("Vector marker_stages_filter has 0 length. Please provide a non-zero length vector.")
+    }
+    mean_2_cell <- SCOPRO:::mean_stage(norm_vivo, cluster_vivo, name_vivo, 
+        marker_stages_filter)
+    connettivity_vivo <- SCOPRO:::find_connettivity(mean_2_cell, fold_change, 
+        threshold_fold_change)
+    name_cells <- colnames(norm_vitro)
+    link_kept <- rep(list(0), length(name_cells))
+    link_no_kept <- rep(list(0), length(name_cells))
+    final_score <- rep(list(0), length(name_cells))
+    for (i in 1:length(colnames(norm_vitro))) {
+      
+        #mean_cluster <- mean_stage(norm_vitro, cluster_vitro, 
+            #name_cluster[i], marker_stages_filter)
+      single_cell_value= norm_vitro[marker_stages_filter,i]
+        connettivity_vitro <- SCOPRO:::find_connettivity(single_cell_value, 
+            fold_change, threshold_fold_change)
+        connettivity_vitro <- connettivity_vitro[row.names(connettivity_vivo), 
+            colnames(connettivity_vivo)]
+        index_specific <- which(selected_stages %in% name_vivo)
+        marker_specific <- marker_stages[[index_specific]]
+        if (length(marker_specific) == 0) {
+            stop(paste0("There are no markers for the stage: ", 
+                name_vivo))
+        }
+        result_comparison <- SCOPRO:::comparison_vivo_vitro(connettivity_vivo, 
+            connettivity_vitro, threshold, number_link, marker_specific)
+        link_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]] == 
+            1]
+        if (length(link_kept[[i]]) == 0) {
+            warning(paste0("There are not conserved genes between ", 
+                name_vivo, " and ", colnames(norm_vitro)[i]))
+        }
+        link_no_kept[[i]] <- names(result_comparison[[1]])[result_comparison[[2]] != 
+            1]
+        names(link_kept[[i]]) <- rep(colnames(norm_vitro)[i], length(link_kept[[i]]))
+        names(link_no_kept[[i]]) <- rep(colnames(norm_vitro)[i], length(link_no_kept[[i]]))
+        final_score[[i]] <- result_comparison[[3]]
+        names(final_score[[i]]) <- colnames(norm_vitro)[i]
+    }
+    
+    
+    
+    common_link <- Reduce(intersect, link_kept)
+    if (length(common_link) == 0) {
+        warning(paste0("There are not conserved genes between all the in vitro cells and ", 
+            name_vivo))
+    }
+    no_common_link <- Reduce(intersect, link_no_kept)
+    return(list(common_link, no_common_link, link_kept, link_no_kept, 
+        final_score))
+}
+
+
+```
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+selected_stages = relevant_stages
+
+analysis_2cell_sc=SCOPRO_single_cell(norm_es_vitro,norm_vivo,cluster_mouse_published,"epiblast_4.5",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+png("/Users/gabriele.lubatti/Downloads/scopro_no_late2_epi_4_5.png")
+plot_score(analysis_2cell,marker_stages,marker_stages_filter,selected_stages,"epiblast_4.5","Final score","Cluster","epiblast_4.5")
+dev.off()
+
+```
+
+```{r }
+plot_score_sc= function (SCOPRO_output, cluster_vitro, marker_stages, marker_stages_filter, 
+    selected_stages, name_vivo, y_name, fill_name, title_name) 
+{
+  
+    final_score <- c(as.vector(unlist(SCOPRO_output[[5]])))
+    label <- cluster_vitro
+    df <- data.frame(final_score, label)
+    index_specific <- which(selected_stages %in% name_vivo)
+    marker_specific <- marker_stages[[index_specific]]
+    p <- ggplot2::ggplot(df, ggplot2::aes(x = label, y = final_score, 
+        fill = label)) + geom_boxplot()+geom_jitter(position=position_jitter(0.2)) + 
+        ggplot2::theme_minimal()
+    p + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+        vjust = 1, hjust = 1), axis.title.x = ggplot2::element_blank()) + 
+        ggplot2::ylab(y_name) + ggplot2::labs(fill = fill_name) + 
+        ggplot2::ylim(c(-0.1, 1)) + ggplot2::ggtitle(paste0(title_name, 
+        " (", sum(marker_stages_filter %in% marker_specific), 
+        " genes)", sep = " "))
+}
+```
+
+```{r }
+plot_score_sc(analysis_2cell_sc,cluster_es_vitro,marker_stages,marker_stages_filter,selected_stages,"epiblast_4.5","Final score","Cluster","epiblast_4.5")
+```
+
+```{r}
+select_common_genes_sc = function (SCOPRO_output, marker_stages, selected_stages, name_vivo, 
+    cluster_vitro, name_vitro, threshold = 0.5) 
+{
+    if (sum(name_vivo %in% selected_stages) == 0) {
+        stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+    if (sum(name_vitro %in% cluster_vitro) == 0) {
+        stop("name_vitro must be one the stages present in the vector cluster_vitro")
+    }
+    index_specific <- which(selected_stages %in% name_vivo)
+    marker_specific <- marker_stages[[index_specific]]
+    #index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+    
+    cells_specific <- analysis_2cell_sc[[3]][cluster_vitro == name_vitro]
+    common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+    
+    if (length(common_genes_cells) == 0) {
+        warning("There are not conserved genes between the cells in the in vitro cluster")
+      return(NULL)
+    }
+    
+    if (length(common_genes_cells) > 0) {
+      common_genes <- common_genes_cells[common_genes_cells %in% 
+        marker_specific]
+      if (length(common_genes) == 0) {
+        warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+      return(common_genes)
+    }
+    
+    else{
+      return(NULL)
+    }
+}
+```
+
+```{r}
+select_no_common_genes_sc = function (SCOPRO_output, marker_stages, selected_stages, name_vivo, 
+    cluster_vitro, name_vitro, threshold = 0.5) 
+{
+    if (sum(name_vivo %in% selected_stages) == 0) {
+        stop("name_vivo must be one the stages present in the vector selected_stages")
+    }
+    if (sum(name_vitro %in% cluster_vitro) == 0) {
+        stop("name_vitro must be one the stages present in the vector cluster_vitro")
+    }
+    index_specific <- which(selected_stages %in% name_vivo)
+    marker_specific <- marker_stages[[index_specific]]
+    #index_vitro <- which(levels(factor(cluster_vitro)) %in% name_vitro)
+    
+    cells_specific <- analysis_2cell_sc[[4]][cluster_vitro == name_vitro]
+    common_genes_cells <- names(table(unlist(cells_specific)))[table(unlist(cells_specific)) > threshold * sum(cluster_vitro == name_vitro)]
+    
+    if (length(common_genes_cells) == 0) {
+        warning("There are not conserved genes between the cells in the in vitro cluster")
+      return(NULL)
+    }
+    
+    if (length(common_genes_cells) > 0) {
+      common_genes <- common_genes_cells[common_genes_cells %in% 
+        marker_specific]
+      if (length(common_genes) == 0) {
+        warning("There are not conserved genes between the cells in the in vitro cluster and the in vivo stage")}
+      return(common_genes)
+    }
+    
+    else{
+      return(NULL)
+    }
+}
+```
+
+
+
+```{r}
+
+
+common_genes_sc=select_common_genes_sc(analysis_2cell_sc,marker_stages,selected_stages,"epiblast_4.5",cluster_es_vitro,"0", threshold = 0.5)
+
+no_common_genes_sc=select_no_common_genes_sc(analysis_2cell,marker_stages,selected_stages,"epiblast_4.5",cluster_es_vitro,"0")
+
+
+
+
+all_genes=c(no_common_genes_sc[1:4],common_genes_sc[1:10])
+all_genes_label=c(paste0(no_common_genes_sc[1:4],"-no_conserved"),paste0(common_genes_sc[1:10],"-conserved"))
+
+
+
+
+rabbit_plot=plot_score_genes(all_genes,"Mouse ESC","Mouse vitro", norm_es_vitro,norm_vivo[,cluster_mouse_published=="epiblast_4.5"],cluster_es_vitro,cluster_mouse_published[cluster_mouse_published=="epiblast_4.5"],all_genes_label,7,10,"epiblast_4.5")
+
+rabbit_plot
+
+
+
+
+
+```
+
+```{r}
+```
+
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+selected_stages = relevant_stages
+
+analysis_2cell=SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"epiblast_5.5",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+png("/Users/gabriele.lubatti/Downloads/scopro_no_late2_epi_5_5.png")
+plot_score(analysis_2cell,marker_stages,marker_stages_filter,selected_stages,"epiblast_5.5","Final score","Cluster","epiblast_5.5")
+dev.off()
+
+```
+
+
+# SCOPRO with late 2 cells
+
+
+
+```{r }
+
+
+DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+cluster_mouse_published=as.vector(seurat_genes_published_mouse$stim)
+
+
+selected_stages=c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+
+markers_first_ESC_small=markers_cluster_seurat(seurat_genes_published_mouse[,cluster_mouse_published%in%selected_stages],cluster_mouse_published[cluster_mouse_published%in%selected_stages],names(seurat_genes_published_mouse$RNA_snn_res.0.2)[cluster_mouse_published%in%selected_stages],10)
+
+```
+
+```{r }
+cluster_es_vitro=cluster_ane_0
+norm_es_vitro=norm_counts_ane_0
+```
+
+```{r }
+
+
+markers_mouse=as.vector(markers_first_ESC_small[[3]])
+stages_markers=names(markers_first_ESC_small[[3]])
+
+## Keeping only the genes in common between in vitro and in vivo datasets
+stages_markers=stages_markers[markers_mouse%in%row.names(norm_es_vitro)]
+
+markers_small=markers_mouse[markers_mouse%in%row.names(norm_es_vitro)]
+names(markers_small)=stages_markers
+```
+
+
+
+
+```{r }
+relevant_stages=c("Late_2_cell", "epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+
+relevant_stages=levels(factor(relevant_stages))
+
+marker_result=select_top_markers(relevant_stages,cluster_mouse_published,norm_vivo,markers_small)
+marker_all=marker_result[[1]]
+marker_stages=marker_result[[2]]
+
+```
+
+
+
+```{r }
+
+
+marker_stages_filter=filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
+
+selected_stages = relevant_stages
+
+analysis_2cell=SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"Late_2_cell",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+
+plot_score(analysis_2cell,marker_stages,marker_stages_filter,selected_stages,"Late_2_cell","Final score","Cluster","Late_2_cell")
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+common_genes=select_common_genes(analysis_2cell,marker_stages,selected_stages,"Late_2_cell",cluster_es_vitro,"2")
+no_common_genes=select_no_common_genes(analysis_2cell,marker_stages,selected_stages,"Late_2_cell",cluster_es_vitro,"2")
+
+
+
+
+all_genes=c(no_common_genes[1:4],common_genes[1:10])
+all_genes_label=c(paste0(no_common_genes[1:4],"-no_conserved"),paste0(common_genes[1:10],"-conserved"))
+
+
+
+
+rabbit_plot=plot_score_genes(all_genes,"Mouse ESC","Mouse vitro", norm_es_vitro,norm_vivo[,cluster_mouse_published=="Late_2_cell"],cluster_es_vitro,cluster_mouse_published[cluster_mouse_published=="Late_2_cell"],all_genes_label,7,10,"Late_2_cell")
+
+rabbit_plot
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+# Data saved for adding the reproducible example on CRAN
+
+
+```{r }
+
+
+cluster_ane_0_small=cluster_ane_0[index_es_vitro_small]
+
+norm_counts_ane_0_small=norm_counts_ane_0[marker_all,index_es_vitro_small]
+
+norm_vivo_small=norm_vivo[marker_all,cluster_mouse_published%in%selected_stages]
+cluster_mouse_published_small=cluster_mouse_published[cluster_mouse_published%in%selected_stages]
+
+```
+
+
+
+```{r}
+setwd("/Users/gabriele.lubatti/Downloads/input_SCOPRO")
+save(cluster_es_vitro_small,file="cluster_es_vitro_small.Rda")
+save(norm_es_vitro_small,file="norm_es_vitro_small.Rda")
+save(norm_vivo_small,file="norm_vivo_small.Rda")
+cluster_vivo_small= cluster_mouse_published_small
+save(cluster_vivo_small,file="cluster_vivo_small.Rda")
+save(marker_stages_filter,file="marker_stages_filter.Rda")
+save(marker_stages, file="marker_stages.Rda")
+```
+
+```{r }
+
+
+
+output_SCOPRO=SCOPRO(norm_es_vitro_small,norm_vivo_small,cluster_es_vitro_small,cluster_vivo_small,"Late_2_cell",marker_stages_filter,0.1,1,3,threshold_fold_change = 0.1,marker_stages,selected_stages)
+
+
+
+plot_score(output_SCOPRO,marker_stages,marker_stages_filter,selected_stages,"Late_2_cell","Final score","Cluster","Late_2_cell")
+
+
+```
+
+
+
+
+
+# Functions definition
+
+
+
+```{r}
+findCellTypesScibet = function(queryObj, referenceObj, namedLabels){
+if (!(requireNamespace(c("scibetR"), quietly = TRUE))) {
+        stop("Package scibetR needed for this function to work. Please install it: devtools::install_github('PaulingLiu/scibet')")
+    }
+
+norm_vitro=as.matrix(GetAssayData(queryObj, slot = "data",assay="RNA"))
+norm_vitro = t(norm_vitro)
+norm_vitro= apply(norm_vitro, 2, as.numeric)
+norm_vitro = as.data.frame(norm_vitro)
+norm_vivo=as.data.frame(GetAssayData(referenceObj, slot = "data",assay="RNA"))
+norm_vivo = t(norm_vivo)
+norm_vivo= apply(norm_vivo, 2, as.numeric)
+norm_vivo = as.data.frame(norm_vivo)
+norm_vivo_full = cbind(norm_vivo,as.vector(namedLabels))
+colnames(norm_vivo_full)=c(colnames(norm_vivo),"label")
+norm_vivo_full=as.data.frame(norm_vivo_full)
+row.names(norm_vivo_full)=NULL
+
+predictions<-scibetR::SciBet_R(norm_vivo_full,norm_vitro)
+queryObj <- Seurat::AddMetaData(object = queryObj, metadata = predictions, col.name = "predictions")
+return(queryObj)
+}
+```
+
+
+
+
+```{r}
+findCellTypes_scmap=function(queryObj, referenceObj, namedLabels,n_features = 500,threshold = 0.7) {
+  
+  
+#queryObj = mayra_seurat_0
+#referenceObj = seurat_genes_published_mouse_small
+#namedLabels = cluster_mouse_rename_small
+#n_features = 500
+#threshold = 0.7
+  if (!(requireNamespace(c("scmap","SingleCellExperiment"), quietly = TRUE))) {
+        stop("Package scmap and SingleCellExperiment needed for this function to work. Please install them: BiocManager::install('scmap') and BiocManager::install('SingleCellExperiment')")
+    }
+norm_vivo = as.matrix(GetAssayData(referenceObj, slot = "data",assay="RNA"))
+raw_vivo = as.matrix(GetAssayData(referenceObj, slot = "counts",assay="RNA"))
+
+norm_vitro <- as.matrix(GetAssayData(queryObj, slot = "data",assay="RNA"))
+
+raw_vitro <- as.matrix(GetAssayData(queryObj, slot = "counts",assay="RNA"))
+
+sce_pro <- SingleCellExperiment::SingleCellExperiment(assays = list(normcounts = as.matrix(norm_vitro)))
+logcounts(sce_pro) <- (normcounts(sce_pro))
+rowData(sce_pro)$feature_symbol <- rownames(sce_pro)
+counts(sce_pro)=as.matrix(raw_vitro)
+
+
+
+cell_type1=as.data.frame(namedLabels)
+row.names(cell_type1)=colnames(norm_vivo)
+colnames(cell_type1)="cells_type1"
+
+sce <- SingleCellExperiment::SingleCellExperiment(assays = list(normcounts = as.matrix(norm_vivo)), colData = cell_type1)
+logcounts(sce) <- (normcounts(sce))
+counts(sce)=(raw_vivo)
+
+
+rowData(sce)$feature_symbol <- rownames(sce)
+sce <- sce[!duplicated(rownames(sce)), ]
+sce
+sce <- scmap::selectFeatures(sce, suppress_plot = TRUE,n_features = n_features)
+
+
+
+sce <- scmap::indexCluster(sce,cluster_col = "cells_type1")
+
+
+
+scmapCluster_results <- scmap::scmapCluster(
+  projection = sce_pro, 
+  index_list = list(
+    yan = metadata(sce)$scmap_cluster_index
+  ),threshold = threshold
+  
+  
+  
+  
+)
+
+result_label=as.vector(scmapCluster_results$scmap_cluster_labs)
+#result_similarity=(scmapCluster_results$scmap_cluster_siml)
+queryObj <- Seurat::AddMetaData(object = queryObj, metadata = result_label, col.name = "predictions")
+
+return(queryObj)
+}
+```
+
+
+## Functions to add
+```{r}
+cellTypesPerClusterBalloonPlot_small = function (obj, cluster_vivo_factor, order_label_vivo, title_name, method = "Seurat",text_size = 0.4, 
+    label_size = 0.7, thresold = 0.5) 
+{
+  if (method == "Seurat"){
+    
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+        stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= 
+        thresold] <- "Unassigned"
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo))
+    if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
+        levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+        levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo,"Unassigned"))
+    }
+    
+    cellTypes <- rep(levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predicted.id))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predicted.id))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predicted.id))]) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+  }
+  
+  if (method == "scibetR"){
+    
+    
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+        stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    
+    cellTypes <- rep(levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% 
+        unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels(cluster_vivo_factor)[levels(cluster_vivo_factor) %in% 
+        unique(as.vector(obj@meta.data$predictions))]) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    
+    
+  }
+  
+  if (method == "scmap"){
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels =  c(order_label_vivo,"unassigned"))
+    
+    
+    cellTypes <- rep(levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predictions))], each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(unique(as.vector(obj@meta.data$predictions))))
+    nElements <- numeric()
+    for (cellType in levels_vitro[levels_vitro %in% 
+        unique(as.vector(obj@meta.data$predictions))]) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    
+    
+  }
+  
+  if (method != "Seurat" & method != "ScibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, ScibetR or scmap")
+  }
+  
+  
+}
+```
+
+
+```{r}
+cellTypesPerClusterBalloonPlot = function (obj, cluster_vivo_factor, order_label_vivo, method = "Seurat", title_name, 
+    text_size = 0.4, label_size = 0.4, thresold = 0.5) 
+{
+  if (method == "Seurat"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+        stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= 
+        thresold] <- "Unassigned"
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+    if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
+        levels_vitro <- c(levels(cluster_vivo_factor), "Unassigned")
+        levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, 
+            "Unassigned"))
+    }
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predicted.id) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+  }
+  
+  if (method == "ScibetR"){
+     if (!(requireNamespace("gplots", quietly = TRUE))) {
+        stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    
+    levels_vitro <- c(levels(cluster_vivo_factor))
+    levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    
+  }
+  
+  if (method == "scmap"){
+    if (!(requireNamespace("gplots", quietly = TRUE))) {
+        stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
+    }
+    
+    levels_vitro <- c(levels(cluster_vivo_factor), "unassigned")
+    levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo, 
+            "unassigned"))
+    
+    cellTypes <- rep(levels(levels_vitro_factor), each = length(unique(as.vector(obj$seurat_clusters))))
+    clusters <- rep(unique(as.vector(obj$seurat_clusters)), length(levels(levels_vitro_factor)))
+    nElements <- numeric()
+    for (cellType in levels(levels_vitro_factor)) {
+        nElements <- c(nElements, table(factor(as.vector(obj$seurat_clusters)[which(as.vector(obj@meta.data$predictions) == 
+            cellType)], levels = unique(as.vector(obj$seurat_clusters)))))
+    }
+    data <- data.frame(cellTypes, clusters, nElements)
+    for (cluster in unique(data$clusters)) {
+        data$nElements[which(data$clusters == cluster)] <- 100 * 
+            data$nElements[which(data$clusters == cluster)]/sum(data$nElements[which(data$clusters == 
+            cluster)])
+    }
+    return(gplots::balloonplot(data$cellTypes, data$clusters, 
+        data$nElements, label.size = label_size, text.size = text_size, 
+        ylab = "", xlab = "", main = title_name))
+    
+  }
+  
+  if (method != "Seurat" & method != "ScibetR" & method != "scmap"){
+    stop("method must be equal to Seurat, ScibetR or scmap.")
+  }
+  
+  }
+```
+
+
+# Projection with published methods
+
+In SCOPRO is possible to run commonly used methods for projection such as Seurat and scibetR. It is possible to run the two methods within SCOPRO with wrapper functions **findCellTypesScibet** and **findCellTypesSeurat**. 
+The ouptut of these methods could be used to select only the in vivo stages with a minimum fraction of in vitro cells mapped.
+It is then possible to run **SCOPRO** starting only from these in vivo stages.
+
+```{r}
+DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
+
+
+selected_stages = c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+cluster_mouse_published_small = cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small=plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+
+
+seurat_genes_published_mouse_small = seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+
+
+```
+
+# ScibetR
+```{r}
+mayra_seurat_0_scibet = findCellTypesScibet(mayra_seurat_0, seurat_genes_published_mouse_small, cluster_mouse_rename_small)
+```
+
+```{r}
+
+
+cluster_vitro_factor=factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vitro = c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_scibet, cluster_vitro_factor, order_label_vitro, method = "ScibetR",  title_name  = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+
+cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_scibet, cluster_vitro_factor,order_label_vitro, method = "ScibetR", title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+```
+
+
+# Seurat
+```{r}
+
+mayra_seurat_0_seurat <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor = 5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+```
+ 
+```{r}
+ 
+
+# png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_seurat, cluster_vitro_factor, order_label_vitro, method = "Seurat", title_name  = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+ #dev.off()
+ 
+ cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_seurat, cluster_vitro_factor,order_label_vitro, method = "Seurat",  title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+ 
+ 
+ 
+ 
+```
+
+```{r}
+library(scmap)
+library(SingleCellExperiment)
+```
+
+
+
+
+# scmap
+```{r}
+
+mayra_seurat_0_scmap <- findCellTypes_scmap(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, namedLabels = cluster_mouse_rename_small, n_features = 500,threshold = 0.7)
+```
+
+
+```{r}
+ 
+
+# png("/Users/gabriele.lubatti/Downloads/seurat_yes_late2.png")
+ cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0_scmap, cluster_vitro_factor, order_label_vitro, method = "scmap", title_name  = "Projection Mouse ESC on mouse embryos " ,1,1,0.1)
+ #dev.off()
+ 
+ cellTypesPerClusterBalloonPlot_small(obj = mayra_seurat_0_scmap, cluster_vitro_factor,order_label_vitro, method = "scmap",  title_name = "Projection Mouse ESC on mouse embryos " ,1,1,0.8)
+ 
+ 
+ 
+ 
+```
+
+
+
+# Function to add
+
+```{r}
+markers_cluster_seurat = function (seurat_object, cluster, cell_names, number_top) 
+{
+    if (!(requireNamespace("Seurat", quietly = TRUE))) {
+        stop("Package Seurat needed for this function to work. Please install it: install.packages('Seurat')")
+    }
+    level <- levels(as.factor(cluster))
+    marker_cluster <- as.list(rep(0, length(level)))
+    marker_all <- de_seurat_cluster(seurat_object, cluster, cell_names, 
+        0.05)
+    for (i in 1:length(level)) {
+        marker_cluster[[i]] <- marker_all[[i]]
+        message(paste0("Cluster ", level[i]))
+    }
+    marker_all <- unlist(marker_cluster)
+    marker_all <- marker_all[Biobase::isUnique(marker_all)]
+    for (i in 1:length(level)) {
+        marker_cluster[[i]] <- marker_cluster[[i]][marker_cluster[[i]] %in% 
+            marker_all]
+    }
+    marker_to_see <- as.list(rep(0, length(level)))
+    marker_complete <- as.list(rep(0, length(level)))
+    for (i in 1:length(level)) {
+        if (length(marker_cluster[[i]]) >= number_top) {
+            marker_to_see[[i]] <- marker_cluster[[i]][1:number_top]
+            names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]]))
+            marker_complete[[i]] <- marker_cluster[[i]]
+            names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+        }
+        if ((length(marker_cluster[[i]]) > 0) & (length(marker_cluster[[i]]) < 
+            number_top)) {
+            marker_to_see[[i]] <- marker_cluster[[i]][1:length(marker_cluster[[i]])]
+            names(marker_to_see[[i]]) <- rep(level[i], length(marker_to_see[[i]]))
+            marker_complete[[i]] <- marker_cluster[[i]]
+            names(marker_complete[[i]]) <- rep(level[i], length(marker_complete[[i]]))
+        }
+        if (length(marker_cluster[[i]]) == 0) {
+            marker_to_see[[i]] <- NULL
+            marker_complete[[i]] <- NULL
+        }
+    }
+    marker_top <- unlist(marker_to_see)
+    marker_top <- marker_top[marker_top != 0]
+    marker_complete <- unlist(marker_complete)
+    marker_complete <- marker_complete[marker_complete != 0]
+    marker_all_cluster_sing <- as.list(rep(0, length(level)))
+    for (i in 1:length(level)) {
+        if (sum(names(marker_top) == level[i]) > 0) {
+            marker_all_cluster_sing[[i]] <- paste(marker_top[names(marker_top) == 
+                level[i]], level[i], sep = "_")
+        }
+        else {
+        }
+    }
+    marker_all_cluster <- unlist(marker_all_cluster_sing)
+    marker_all_cluster <- marker_all_cluster[marker_all_cluster != 
+        0]
+    return(list(marker_top, marker_all_cluster, marker_complete))
+}
+```
+
+```{r}
+de_seurat_cluster = function (seurat_object, cluster, names_cell, max_p_value) 
+{
+    level <- levels(as.factor(cluster))
+    final_markers <- vector("list", length(level))
+    for (i in 1:length(level)) {
+        markers <- Seurat::FindMarkers(seurat_object, ident.1 = names_cell[cluster == 
+            level[i]], ident.2 = names_cell[cluster != level[i]], 
+            only.pos = T)
+        markers_new <- markers[markers$p_val_adj <= max_p_value, 
+            ]
+        markers_new <- markers_new[order(markers_new$p_val_adj), 
+            ]
+        markers_final <- row.names(markers_new)
+        final_markers[[i]] <- markers_final
+    }
+    return(final_markers)
+}
+```
+
+```{r}
+create_seurat_object = function (raw_counts, project_name, resolution, neighbors, max_dimension, 
+    feature_genes = NULL) 
+{
+    if (!(requireNamespace("Seurat", quietly = TRUE))) {
+        stop("Package Seurat needed for this function to work. Please install it: install.packages('Seurat')")
+    }
+    nFeature_RNA <- NULL
+    seurat_object <- Seurat::CreateSeuratObject(counts = raw_counts, 
+        project = project_name)
+    seurat_object <- subset(seurat_object, subset = nFeature_RNA > 
+        0)
+    seurat_object <- Seurat::NormalizeData(seurat_object, verbose = FALSE)
+    seurat_object <- Seurat::FindVariableFeatures(seurat_object, 
+        selection.method = "vst", nfeatures = 2000)
+    seurat_object <- Seurat::ScaleData(seurat_object, verbose = FALSE)
+    seurat_object <- Seurat::RunPCA(seurat_object, npcs = max_dimension, 
+        verbose = FALSE, features = feature_genes)
+    seurat_object <- Seurat::RunUMAP(seurat_object, reduction = "pca", 
+        dims = 1:20, set.seed = 42)
+    seurat_object <- Seurat::FindNeighbors(seurat_object, reduction = "pca", 
+        dims = 1:max_dimension, k.param = neighbors)
+    seurat_object <- Seurat::FindClusters(seurat_object, resolution = resolution)
+    return(seurat_object)
+}
+
+```
+
+
+
+
+```{r }
+plot_boxplot=function(norm_vivo,gene_name, cluster_vivo,order_label_vivo, title,name_fill,x_axis,y_axis){
+gene_expr= norm_vivo[gene_name,]
+cluster_vivo=factor(cluster_vivo,levels= order_label_vivo)
+data_common=data.frame(cluster_vivo,gene_expr)
+ggplot(data_common, aes(x=cluster_vivo, y=gene_expr,fill= cluster_vivo)) +
+ geom_boxplot()+geom_jitter(position=position_jitter(0.2))+xlab(x_axis)+ylab(y_axis)+ggtitle(title)+labs(fill=name_fill)
+}
+```
+
+
+```{r}
+plot_boxplot(norm_vivo, "Zscan4c", namedLabels, order_label_vitro, "Zscan4","Stage", "Cluster", "Log norm")
+```
+
+
+
+
