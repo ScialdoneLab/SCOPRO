@@ -51,6 +51,10 @@
 #' @importFrom grDevices hcl
 #' @importFrom stats quantile
 #' @importFrom stats median
+#' @importFrom stats cor
+#' @importFrom stats as.dist
+#' @importFrom utils download.file
+#' @importFrom utils unzip
 
 
 
