@@ -874,6 +874,115 @@ norm_vivo=as.matrix(GetAssayData(seurat_genes_published_mouse, slot = "data",ass
 
 ```
 
+
+# Preprocess mouse in vivo dataset
+
+
+
+
+```{r}
+preprocess_mouse_published_data <- function(raw_count_mohammed, stages_mohammed, raw_count_deng, stages_deng, convert_name_id_mouse){
+  stages_mohammed_updates <- stages_mohammed[stages_mohammed != "E3.5"&stages_mohammed != "E6.75"]
+  
+  
+  raw_count_deng <- raw_count_deng[, (stages_deng != "fibroblast") & (stages_deng != "liver") & (stages_deng != "Zygote") & (stages_deng != "2_cell") & (stages_deng != "Mid_2_cell")]
+  
+stages_deng <- stages_deng[(stages_deng !="fibroblast") & (stages_deng != "liver") & (stages_deng != "Zygote") & (stages_deng != "2_cell") & (stages_deng != "Mid_2_cell")]
+
+
+row.names(convert_name_id_mouse) <- convert_name_id_mouse[,1]
+
+common <- intersect(row.names(raw_count_mohammed),row.names(convert_name_id_mouse))
+
+
+name <- convert_name_id_mouse[common, 3]
+
+common_new <- common[isUnique(name)]
+
+name_new <- convert_name_id_mouse[common_new, 3]
+
+raw_count_mohammed_new <- raw_count_mohammed[common_new, ]
+row.names(raw_count_mohammed_new) <- name_new
+
+
+common_mouse <- Reduce(intersect, list(row.names(raw_count_mohammed_new), row.names(raw_count_deng)))
+common_mouse <- common_mouse
+raw_count_mohammed_new_new <- raw_count_mohammed_new[common_mouse, ]
+raw_count_deng <- raw_count_deng[common_mouse, ]
+raw_counts_mouse_all <- cbind(raw_count_mohammed_new_new, raw_count_deng)
+row.names(raw_counts_mouse_all) <- common_mouse
+
+cluster_mouse <- c(cluster_mohammed_updates, stages_deng)
+return(list(raw_counts_mouse_all, cluster_mouse))
+  
+}
+```
+
+
+```{r}
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/Mouse_published_dataset/Mohammed")
+
+
+
+load(file="raw_count_mohammed_updates.Rda")
+load(file="stages_mohammed.Rda")
+stages_mohammed_updates=stages_mohammed[stages_mohammed!="E3.5"&stages_mohammed!="E6.75"]
+load(file="cluster_mohammed_updates.Rda")
+
+```
+
+```{r}
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/Mouse_published_dataset/Deng")
+load("raw_counts_deng.Rda")
+load("stages_deng.Rda")
+load("stages_deng_update.Rda")
+
+
+raw_counts_deng=raw_counts_deng[,(stages_deng_update!="fibroblast")&(stages_deng_update!="liver")&(stages_deng_update!="Zygote")&(stages_deng_update!="2_cell")&(stages_deng_update!="Mid_2_cell")]
+stages_deng_update=stages_deng_update[(stages_deng_update!="fibroblast")&(stages_deng_update!="liver")&(stages_deng_update!="Zygote")&(stages_deng_update!="2_cell")&(stages_deng_update!="Mid_2_cell")]
+#save(raw_count_mohammed,file="raw_count_mohammed.Rda")
+#save(stages_mohammed,file="stages_mohammed.Rda")
+
+#stages_deng=paste0(stages_deng,"_deng")
+
+```
+
+```{r}
+setwd("/Users/gabriele.lubatti/Desktop/Phd/Early_embryonic_like_cells/Mouse/Genome")
+
+genome_mouse=read.table("topo.txt",sep="\t",header = T)
+row.names(genome_mouse)=genome_mouse[,1]
+
+common=intersect(row.names(raw_count_mohammed_updates),row.names(genome_mouse))
+
+
+nomi=genome_mouse[common,3]
+
+common_new=common[isUnique(nomi)]
+
+nomi_new=genome_mouse[common_new,3]
+
+raw_count_mohammed_new=raw_count_mohammed_updates[common_new,]
+row.names(raw_count_mohammed_new)=nomi_new
+
+```
+
+
+
+```{r}
+common_mouse=Reduce(intersect, list(row.names(raw_count_mohammed_new),row.names(raw_counts_deng)))
+final_name_pig=common_mouse
+raw_count_mohammed_new_new=raw_count_mohammed_new[final_name_pig,]
+raw_counts_deng=raw_counts_deng[final_name_pig,]
+raw_counts_mouse_all=cbind(raw_count_mohammed_new_new,raw_counts_deng)
+row.names(raw_counts_mouse_all)=final_name_pig
+
+stages_mouse=c(stages_mohammed_updates,stages_deng_update)
+cluster_mouse=c(cluster_mohammed_updates,stages_deng_update)
+```
+
+
+# Stop preprocess mouse in vivo dataset
 # SCOPRO
 
 ```{r}
@@ -1011,6 +1120,383 @@ mouse_plot
 
 ```
 
+
+
+##New function distance vivo/ vitro
+
+
+```{r }
+download_example_data <- function(){
+current_wd <- getwd()
+url <- "https://hmgubox2.helmholtz-muenchen.de/index.php/s/EHQSnjMJxkR7QYT/download/SCOPRO.zip"
+destfile <- paste0(current_wd,"/SCOPRO.zip")
+download.file(url, destfile, quiet = FALSE)
+unzip(destfile, exdir=current_wd)
+}
+
+```
+
+
+```{r }
+
+
+plot_distance_vivo_vitro <- function(norm_vivo, cluster_vivo, selected_stages, marker_stages, marker_stages_filter, norm_vitro, cluster_vitro, text_size = 10){
+  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+}
+  for (i in selected_stages){
+      index_specific <- which(selected_stages %in% i)
+      marker_specific <- marker_stages[[index_specific]]
+      if (length(marker_specific) == 0) {
+        stop(paste0("There are no markers for the stage: ", i))
+      }
+    }
+    marker_stages_top <- rep(list(0),length(selected_stages))
+    for (i in 1:length(selected_stages)){
+      marker_stages_top[[i]] = marker_stages[[i]]
+    }
+    marker_all <- unlist(marker_stages_top)
+
+marker_all <- marker_all[marker_all%in%marker_stages_filter]
+genes <- marker_all
+mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes, method = "mean")
+
+selected_stages_vitro = levels(factor(cluster_vitro))
+mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes, method = "mean")
+
+
+median_vivo <- matrix(unlist(mean_profile_vivo), ncol = length(mean_profile_vivo), byrow = FALSE)
+median_vitro <- matrix(unlist(mean_profile_vitro), ncol = length(mean_profile_vitro), byrow = FALSE)
+
+median_all_matrix=cbind(median_vivo, median_vitro)
+names_vivo=rep(0,length(mean_profile_vivo))
+for ( i in 1:length(mean_profile_vivo)){
+  j=selected_stages[i]
+names_vivo[i]=paste0("In vivo-",j)}
+
+names_vitro=rep(0,length(mean_profile_vitro))
+for ( i in 1:length(mean_profile_vitro)){
+  j=selected_stages_vitro[i]
+names_vitro[i]=paste0("In vitro-",j)}
+
+colnames(median_all_matrix)=c(names_vivo,names_vitro)
+
+
+
+median_all_matrix<-as.matrix(median_all_matrix)
+dissimilarity <- sqrt((1-cor((median_all_matrix), method = "spearman"))/2)
+
+my.dist <- as.dist(dissimilarity) 
+
+
+dist_mouse=as.matrix(my.dist)
+dist_mouse=dist_mouse[grepl("In vivo-",row.names(dist_mouse)),grepl("In vitro-",row.names(dist_mouse))]
+
+
+
+
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(dist_mouse), 
+        cluster_rows = TRUE, col = circlize::colorRamp2(c(round(min(dist_mouse),2), 
+            round(max(dist_mouse),2)), c("grey", "brown")), 
+        name = "spearman distance", cluster_columns = TRUE, 
+        row_names_gp = grid::gpar(fontsize = text_size), show_column_names = TRUE, 
+        show_row_names = TRUE)
+    ComplexHeatmap::draw(ht21)
+    
+    
+}
+
+
+
+
+
+```
+
+```{r }
+difference_significance_vitro_single <- function(norm_vitro, mean_profile_vitro, mean_profile_vivo, p_value, name_vitro, genes_all, cluster_vitro, selected_stages){
+  norm_vitro_4 <- norm_vitro[genes_all,cluster_vitro==name_vitro]
+  mean_profile_vitro_cluster = mean_profile_vitro[[which(levels(factor(cluster_vitro)) == name_vitro)]]
+  norm_vitro_4_4 <- cbind(norm_vitro_4,mean_profile_vitro_cluster)
+  dissimilarity_4_4 <- sqrt((1-cor((norm_vitro_4_4), method = "spearman"))/2)
+  number_cluster <- selected_stages
+  empirical_p_value <- rep(list(0),length(number_cluster))
+  for (i in 1:length(number_cluster)){
+    norm_vitro_4_2 <- cbind(norm_vitro_4,mean_profile_vivo[[i]])
+    norm_vitro_4_2 <- cbind(norm_vitro_4,mean_profile_vivo[[i]])
+    dissimilarity_4_2 <- sqrt((1-cor((norm_vitro_4_2), method = "spearman"))/2)
+    mean_4_2 <- mean(dissimilarity_4_2[, length(colnames(dissimilarity_4_4))])
+    limit <- as.numeric(quantile(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))], probs=c(0, 1-p_value)))
+    if (mean_4_2<limit[1] | mean_4_2>limit[2]){
+      print("Difference statistically significant")
+    }
+    else{
+      print("Difference not statistically significant")
+    }
+    empirical_p_value_one <- sum(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))] > mean_4_2) / length(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))])
+    empirical_p_value[[i]]=empirical_p_value_one
+  }
+  return(empirical_p_value)
+}
+```
+
+```{r }
+difference_significance_vitro <- function(norm_vitro, p_value = 0.10, marker_stages, marker_stages_filter, cluster_vitro, cluster_vivo, selected_stages, norm_vivo){
+  for (i in selected_stages){
+    index_specific <- which(selected_stages %in% i)
+    marker_specific <- marker_stages[[index_specific]]
+    if (length(marker_specific) == 0) {
+      stop(paste0("There are no markers for the stage: ", i))
+    }
+  }
+  marker_stages_top <- rep(list(0),length(selected_stages))
+  for (i in 1:length(selected_stages)){
+    marker_stages_top[[i]] = marker_stages[[i]]
+  }
+  marker_all <- unlist(marker_stages_top)
+  marker_all <- marker_all[marker_all%in%marker_stages_filter]
+  genes_all <- marker_all
+
+  mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes_all, method = "mean")
+
+  selected_stages_vitro = levels(factor(cluster_vitro))
+  mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes_all, method = "mean")
+
+
+  name_vitro <- levels(factor(cluster_vitro))
+  difference_vitro <- rep(list(0),length(name_vitro))
+  for ( i in 1:length(name_vitro)){
+    difference_vitro[[i]] <- difference_significance_vitro_single(norm_vitro,mean_profile_vitro, mean_profile_vivo, p_value = 0.10, name_vitro = name_vitro[i], genes_all, cluster_vitro, selected_stages)
+    if (sum(difference_vitro[[i]] < p_value)){
+      logic_index = which(difference_vitro[[i]] > p_value)
+      cluster_vivo_different = selected_stages[logic_index]
+      print(paste0("In vitro cluster ", name_vitro[i]," is different from in vivo clusters", cluster_vivo_different))
+    }
+    else{
+      print(paste0("In vitro cluster ", name_vitro[i]," is not different from all in vivo clusters"))
+    }
+    names(difference_vitro[[i]]) = selected_stages
+  }
+  names(difference_vitro) = name_vitro
+  return(difference_vitro)
+}
+
+
+
+```
+
+```{r }
+plot_distance_vivo_vitro(norm_vivo_small, cluster_mouse_published_small, selected_stages, marker_stages, marker_stages_filter, norm_vitro, cluster_vitro, text_size = 10)
+
+
+difference_vitro = difference_significance_vitro(norm_vitro,p_value,marker_stages, marker_stages_filter, cluster_vitro, cluster_mouse_published_small, selected_stages, norm_vivo_small)
+
+```
+
+
+
+
+
+##Stop new function 
+
+
+```{r }
+find_median_cluster = function (cluster_vivo, selected_stages, norm_vivo, genes) 
+{
+    number_cluster <- selected_stages
+    median_es <- rep(list(0), length(number_cluster))
+    for (i in 1:length(number_cluster)) {
+        median_es[[i]] <- apply(norm_vivo[genes, cluster_vivo == 
+            number_cluster[i]], 1, "median")
+    }
+    return(median_es)
+}
+
+```
+
+```{r }
+find_mean_cluster <- function (cluster_vivo, selected_stages, norm_vivo, genes, method = "mean") 
+{
+  if (method == "mean"){
+    if (length(selected_stages) > 0){
+      number_cluster <- selected_stages
+      median_es <- rep(list(0), length(number_cluster))
+      for (i in 1:length(number_cluster)) {
+        median_es[[i]] <- apply(norm_vivo[genes, cluster_vivo == number_cluster[i]], 1, "mean")
+        }
+      return(median_es)
+      }
+    if (length(selected_stages) == 0){
+      number_cluster <- selected_stages
+      median_es <- rep(list(0), 1)
+      median_es[[1]] <- mean(norm_vivo[,cluster_vivo == number_cluster])
+      return(median_es)
+    }
+    }
+  if (method == "median"){
+    if (length(selected_stages) > 0){
+      number_cluster <- selected_stages
+      median_es <- rep(list(0), length(number_cluster))
+      for (i in 1:length(number_cluster)) {
+        median_es[[i]] <- apply(norm_vivo[genes, cluster_vivo == number_cluster[i]], 1, "median")
+        }
+      return(median_es)
+      }
+    if (length(selected_stages) == 0){
+      number_cluster <- selected_stages
+      median_es <- rep(list(0), 1)
+      median_es[[1]] <- mean(norm_vivo[,cluster_vivo == number_cluster])
+      return(median_es)
+    }
+    }
+  if (method != "mean" & method != "median"){
+    stop("parameter method from function find_mean_cluster must be equal to mean or median")
+  }
+  }
+```
+
+```{r }
+gg_color_hue = function (n) 
+{
+    hues <- seq(15, 375, length = n + 1)
+    hcl(h = hues, l = 65, c = 100)[1:n]
+}
+```
+
+
+```{r }
+
+plot_score_genes_heatmap <- function(norm_vivo, cluster_vivo, norm_vitro, cluster_vitro, marker_plot, marker_plot_name, mean_profile = FALSE, color_vector = NULL){
+  if (mean_profile == FALSE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+      }
+    if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+      stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+      }
+    if (sum(marker_plot %in% row.names(norm_vivo)) == 0){
+      stop("No provided genes are in the dataset norm_vivo. Please change marker_plot")
+      }
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vivo)]
+    cluster_vitro <- factor(cluster_vitro)
+    index_list = rep(list(0), length(levels(cluster_vitro)))
+    for ( i in 1:length(levels(cluster_vitro))){
+      index_list[[i]] = which(cluster_vitro == levels(cluster_vitro)[i])
+      }
+    index_all <- unlist(index_list)
+    norm_vitro <- norm_vitro[marker_plot, index_all]
+    norm_vivo <- norm_vivo[marker_plot,]
+    heatdata <- cbind(norm_vivo, norm_vitro)
+    cluster_vitro <- cluster_vitro[index_all]
+    cluster_all <- c(cluster_vivo, cluster_vitro) 
+    cluster_unique <- unique(cluster_all)
+    row.names(heatdata) <- marker_plot_name
+    if(is.null(color_vector)){
+      color_cluster=rep(0,length(unique(cluster_all)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+      }
+      names(color_cluster) <- as.character(cluster_unique)}
+    if(!is.null(color_vector)){
+      color_cluster <- rep(0,length(unique(my.cluster_vivo)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- colore_vector[i]
+        }
+      names(color_cluster) <- as.character(cluster_unique)
+      }
+    batch_vivo <- rep("In vivo dataset", length(cluster_vivo))
+    batch_vitro <- rep("In vitro dataset", length(cluster_vitro))
+    batch_all <- c(batch_vivo, batch_vitro)
+    data_heatmap=data.frame(Cluster = cluster_all, Condition = batch_all)
+    haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1", "In vitro dataset" = "yellow 1" )), show_legend = T)
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+    ComplexHeatmap::draw(ht21)
+    }
+  if (mean_profile == TRUE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+      }
+    if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+      stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+      }
+    if (sum(marker_plot %in% row.names(norm_vivo)) == 0){
+      stop("No provided genes are in the dataset norm_vivo. Please change marker_plot")
+      }
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vivo)]
+    selected_stages <- levels(factor(cluster_vitro))
+    median_es <- find_mean_cluster(cluster_vitro, selected_stages, norm_vitro, marker_plot, method = "mean")
+    median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+    colnames(median_es_matrix) <- selected_stages
+    row.names(median_es_matrix) <- marker_plot
+  
+    selected_stages_vivo <- levels(factor(cluster_vivo))
+    median_vivo <- find_mean_cluster(cluster_vivo, selected_stages_vivo, norm_vivo, marker_plot, method = "mean")
+    median_vivo_matrix <- matrix(unlist(median_vivo), ncol = length(median_vivo), byrow = FALSE)
+    colnames(median_vivo_matrix) <- selected_stages_vivo
+    row.names(median_vivo_matrix) <- marker_plot
+    heatdata <- cbind(median_vivo_matrix, median_es_matrix)
+    row.names(heatdata) <- all_genes_label
+    cluster_all <- c(selected_stages_vivo, selected_stages)
+    cluster_unique <- unique(cluster_all)
+    if(is.null(color_vector)){
+      color_cluster <- rep(0,length(unique(cluster_all)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+      }
+      names(color_cluster)=as.character(cluster_unique)}
+    if(!is.null(color_vector)){
+      color_cluster=rep(0,length(unique(cluster_all)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- colore_vector[i]
+        }
+      names(color_cluster) <- as.character(cluster_unique)
+      }
+    batch_vivo <- rep("In vivo dataset", dim(median_vivo_matrix)[2])
+    batch_vitro <- rep("In vitro dataset", dim(median_es_matrix)[2])
+    batch_all <- c(batch_vivo, batch_vitro) 
+    data_heatmap=data.frame(Cluster = cluster_all, Condition = batch_all)
+    haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1", "In vitro dataset" = "yellow 1")), show_legend = T)
+  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+  ComplexHeatmap::draw(ht21)
+  }
+  if (!is.logical(mean_profile)) {
+    stop("Parameter mean_profile must be logical")
+  }
+  }
+```
+
+
+```{r }
+plot_score_genes_heatmap(norm_vivo_small[,cluster_mouse_published_small=="Late_2_cell"], cluster_mouse_published_small[cluster_mouse_published_small == "Late_2_cell"], norm_vitro, cluster_vitro, all_genes, all_genes_label, mean_profile = FALSE, color_vector = NULL)
+```
+
+
+```{r }
+plot_score_genes_heatmap(norm_vivo_small[,cluster_mouse_published_small=="Late_2_cell"], cluster_mouse_published_small[cluster_mouse_published_small == "Late_2_cell"], norm_vitro, cluster_vitro, all_genes, all_genes_label, mean_profile = TRUE, color_vector = NULL)
+```
 
 
 
@@ -1216,86 +1702,60 @@ gg_color_hue = function (n)
 }
 ```
 
-```{r }
-for (i in selected_stages){
-    index_specific <- which(selected_stages %in% i)
-    marker_specific <- marker_stages[[index_specific]]
-    if (length(marker_specific) == 0) {
-      stop(paste0("There are no markers for the stage: ", i))
-      }
-  }
-  marker_stages_top = rep(list(0),length(selected_stages))
-  for (i in 1:length(selected_stages)){
-    if (length(marker_stages[[i]]) >= max_number) {
-      marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
-    }
-    else {marker_stages_top[[i]] = marker_stages}
-    }
-  marker_all = unlist(marker_stages_top)
-  median_es <- find_median_cluster(cluster_vivo, norm_vivo, marker_all)
-  median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
-  colnames(median_es_matrix) <- selected_stages
-  row.names(median_es_matrix) <- marker_all
-```
+
  
  
 ```{r }
 
-heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, color_vector = NULL){
-  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
-    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
-  }
-  
-  
-  for (i in selected_stages){
-    index_specific <- which(selected_stages %in% i)
-    marker_specific <- marker_stages[[index_specific]]
-    if (length(marker_specific) == 0) {
-      stop(paste0("There are no markers for the stage: ", i))
+heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_number = 10, cluster_vivo, median_profile = FALSE, color_vector = NULL){
+  if (median_profile == FALSE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
       }
-  }
-  marker_stages_top <- rep(list(0),length(selected_stages))
-  for (i in 1:length(selected_stages)){
-    if (length(marker_stages[[i]]) >= max_number) {
-      marker_stages_top[[i]] <- marker_stages[[i]][1: max_number]
-    }
-    else {marker_stages_top[[i]] <- marker_stages[[i]]}
-    }
-  marker_all <- unlist(marker_stages_top)
-  cluster_vivo <- factor(cluster_vivo, levels = selected_stages)
-  index_list <- rep(list(0), length(levels(cluster_vivo)))
-  for ( i in 1:length(levels(cluster_vivo))){
-    index_list[[i]] <- which(cluster_vivo == levels(cluster_vivo)[i])
-    
-  }
-  
-  index_all <- unlist(index_list)
-  
-  
-  heatdata <- norm_vivo[marker_all, index_all]
-  cluster_vivo <- cluster_vivo[index_all]
-  cluster_unique <- unique(cluster_vivo)
-  row.names(heatdata) <- marker_all
-  
-  if(is.null(color_vector)){
-    color_cluster=rep(0,length(unique(cluster_vivo)))
-    for (i in 1:length(color_cluster) ){
-      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
-    }
-    names(color_cluster) <- as.character(cluster_unique)}
-  if(!is.null(color_vector)){
-  color_cluster <- rep(0,length(unique(my.cluster_vivo)))
-  for (i in 1:length(color_cluster) ){
-    color_cluster[i] <- colore_vector[i]
-    }
-  names(color_cluster) <- as.character(cluster_unique)
-  }
-  color_condition <- "green"
-  batch <- rep("In vivo dataset", length(cluster_vivo))
-  data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
-  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
-  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
-                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+    for (i in selected_stages){
+      index_specific <- which(selected_stages %in% i)
+      marker_specific <- marker_stages[[index_specific]]
+      if (length(marker_specific) == 0) {
+        stop(paste0("There are no markers for the stage: ", i))
+      }
+      }
+    marker_stages_top <- rep(list(0),length(selected_stages))
+    for (i in 1:length(selected_stages)){
+      if (length(marker_stages[[i]]) >= max_number) {
+        marker_stages_top[[i]] <- marker_stages[[i]][1: max_number]
+      }
+      else {marker_stages_top[[i]] <- marker_stages[[i]]}
+      }
+    marker_all <- unlist(marker_stages_top)
+    cluster_vivo <- factor(cluster_vivo, levels = selected_stages)
+    index_list <- rep(list(0), length(levels(cluster_vivo)))
+    for ( i in 1:length(levels(cluster_vivo))){
+      index_list[[i]] <- which(cluster_vivo == levels(cluster_vivo)[i])
+      }
+    index_all <- unlist(index_list)
+    heatdata <- norm_vivo[marker_all, index_all]
+    cluster_vivo <- cluster_vivo[index_all]
+    cluster_unique <- unique(cluster_vivo)
+    row.names(heatdata) <- marker_all
+    if(is.null(color_vector)){
+      color_cluster=rep(0,length(unique(cluster_vivo)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+      }
+      names(color_cluster) <- as.character(cluster_unique)}
+    if(!is.null(color_vector)){
+      color_cluster <- rep(0,length(unique(my.cluster_vivo)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- colore_vector[i]
+        }
+      names(color_cluster) <- as.character(cluster_unique)
+      }
+    color_condition <- "green"
+    batch <- rep("In vivo dataset", length(cluster_vivo))
+    data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+    haCol1 <- ComplexHeatmap::HeatmapAnnotation(df = data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
                   , name = "log norm counts"
                   #, column_title = "Absolute values"
                   #, cluster_columns = as.dendrogram(my.tree)
@@ -1306,7 +1766,69 @@ heatmap_markers_vivo <- function(norm_vivo, marker_stages, selected_stages, max_
                   , show_column_names = F
                   , show_row_names = T
                   )
-  ComplexHeatmap::draw(ht21)
+    ComplexHeatmap::draw(ht21)
+    }
+  if (median_profile == TRUE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+      }
+    for (i in selected_stages){
+      index_specific <- which(selected_stages %in% i)
+      marker_specific <- marker_stages[[index_specific]]
+      if (length(marker_specific) == 0) {
+        stop(paste0("There are no markers for the stage: ", i))
+      }
+      }
+    marker_stages_top <- rep(list(0),length(selected_stages))
+    for (i in 1:length(selected_stages)){
+      if (length(marker_stages[[i]]) >= max_number) {
+        marker_stages_top[[i]] = marker_stages[[i]][1: max_number]
+      }
+      else {marker_stages_top[[i]] = marker_stages[[i]]}
+      }
+    marker_all <- unlist(marker_stages_top)
+    median_es <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, marker_all, method = "median")
+    median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+    colnames(median_es_matrix) <- selected_stages
+    row.names(median_es_matrix) <- marker_all
+    heatdata <- median_es_matrix
+    cluster_vivo <- selected_stages
+    cluster_unique=unique(cluster_vivo)
+    row.names(heatdata) <- marker_all
+    if(is.null(color_vector)){
+      color_cluster <- rep(0,length(unique(cluster_vivo)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+      }
+      names(color_cluster) <- as.character(cluster_unique)}
+    if(!is.null(color_vector)){
+      color_cluster=rep(0,length(unique(my.cluster_vivo)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- colore_vector[i]
+        }
+      names(color_cluster) <- as.character(cluster_unique)
+      }
+    color_condition <- "green"
+    batch <- rep("In vivo dataset", length(cluster_vivo))
+    data_heatmap=data.frame(Cluster = cluster_vivo, Condition = batch)
+    haCol1 <- ComplexHeatmap::HeatmapAnnotation(df = data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vivo dataset" = "green 1")), show_legend = T)
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+    ComplexHeatmap::draw(ht21)
+    }
+  if (!is.logical(median_profile)) {
+    stop("Parameter median_profile must be logical")
+  }
   }
 
 ```
@@ -1385,51 +1907,44 @@ heatmap_markers_vivo_median_profile <- function(norm_vivo, marker_stages, select
 
 ```{r }
 
-heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_vector = NULL){
-  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
-    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
-  }
-  
-  if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
-    stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
-  }
-  marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
-  
-  cluster_vitro <- factor(cluster_vitro)
-  index_list = rep(list(0), length(levels(cluster_vitro)))
-  for ( i in 1:length(levels(cluster_vitro))){
-    index_list[[i]] = which(cluster_vitro == levels(cluster_vitro)[i])
-    
-  }
-  
-  index_all <- unlist(index_list)
-  
-  
-  
-  heatdata <- norm_vitro[marker_plot, index_all]
-  cluster_vitro <- cluster_vitro[index_all]
-  cluster_unique <- unique(cluster_vitro)
-  row.names(heatdata) <- marker_plot
-  
-  if(is.null(color_vector)){
-    color_cluster=rep(0,length(unique(cluster_vitro)))
-    for (i in 1:length(color_cluster) ){
-      color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
-    }
-    names(color_cluster) <- as.character(cluster_unique)}
-  if(!is.null(color_vector)){
-  color_cluster <- rep(0,length(unique(my.cluster_vitro)))
-  for (i in 1:length(color_cluster) ){
-    color_cluster[i] <- colore_vector[i]
-    }
-  names(color_cluster) <- as.character(cluster_unique)
-  }
-  color_condition <- "green"
-  batch <- rep("In vitro dataset", length(cluster_vitro))
-  data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
-  haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "green 1")), show_legend = T)
-  ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
-                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("blue", "red"))
+heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, mean_profile = FALSE, color_vector = NULL){
+  if (mean_profile == FALSE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+      }
+    if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+      stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+      }
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+    cluster_vitro <- factor(cluster_vitro)
+    index_list = rep(list(0), length(levels(cluster_vitro)))
+    for ( i in 1:length(levels(cluster_vitro))){
+      index_list[[i]] = which(cluster_vitro == levels(cluster_vitro)[i])
+      }
+    index_all <- unlist(index_list)
+    heatdata <- norm_vitro[marker_plot, index_all]
+    cluster_vitro <- cluster_vitro[index_all]
+    cluster_unique <- unique(cluster_vitro)
+    row.names(heatdata) <- marker_plot
+    if(is.null(color_vector)){
+      color_cluster=rep(0,length(unique(cluster_vitro)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+      }
+      names(color_cluster) <- as.character(cluster_unique)}
+    if(!is.null(color_vector)){
+      color_cluster <- rep(0,length(unique(my.cluster_vitro)))
+      for (i in 1:length(color_cluster) ){
+        color_cluster[i] <- colore_vector[i]
+        }
+      names(color_cluster) <- as.character(cluster_unique)
+      }
+    color_condition <- "green"
+    batch <- rep("In vitro dataset", length(cluster_vitro))
+    data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+    haCol1 <- ComplexHeatmap::HeatmapAnnotation(df = data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "yellow 1")), show_legend = T)
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
                   , name = "log norm counts"
                   #, column_title = "Absolute values"
                   #, cluster_columns = as.dendrogram(my.tree)
@@ -1440,7 +1955,60 @@ heatmap_markers_vitro <- function(norm_vitro, marker_plot, cluster_vitro, color_
                   , show_column_names = F
                   , show_row_names = T
                   )
-  ComplexHeatmap::draw(ht21)
+    ComplexHeatmap::draw(ht21)
+    }
+  if (mean_profile == TRUE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+  }
+    if (sum(marker_plot %in% row.names(norm_vitro)) == 0){
+      stop("No provided genes are in the dataset norm_vitro. Please change marker_plot")
+  }
+    marker_plot <- marker_plot[marker_plot %in% row.names(norm_vitro)]
+    selected_stages <- levels(factor(cluster_vitro))
+    median_es <- find_mean_cluster(cluster_vitro, selected_stages, norm_vitro, marker_plot, method = "mean")
+   median_es_matrix <- matrix(unlist(median_es), ncol = length(median_es), byrow = FALSE)
+   colnames(median_es_matrix) <- selected_stages
+   row.names(median_es_matrix) <- marker_plot
+  
+   heatdata <- median_es_matrix
+  
+   cluster_vitro <- selected_stages
+   cluster_unique <- unique(cluster_vitro)
+   if(is.null(color_vector)){
+     color_cluster <- rep(0,length(unique(cluster_vitro)))
+     for (i in 1:length(color_cluster) ){
+       color_cluster[i] <- gg_color_hue(length(color_cluster))[i]
+     }
+     names(color_cluster)=as.character(cluster_unique)}
+   if(!is.null(color_vector)){
+     color_cluster=rep(0,length(unique(my.cluster_vitro)))
+     for (i in 1:length(color_cluster) ){
+       color_cluster[i] <- colore_vector[i]
+       }
+     names(color_cluster) <- as.character(cluster_unique)
+     }
+   color_condition <- "green"
+   batch <- rep("In vitro dataset", length(cluster_vitro))
+   data_heatmap=data.frame(Cluster = cluster_vitro, Condition = batch)
+   haCol1 <- ComplexHeatmap::HeatmapAnnotation(df= data_heatmap,col=list(Cluster=color_cluster,Condition = c("In vitro dataset" = "yellow 1")), show_legend = T)
+   ht21 <- ComplexHeatmap::Heatmap(as.matrix(heatdata)
+                  , col= circlize::colorRamp2(c(0, round(max(heatdata),4)), c("grey", "brown"))
+                  , name = "log norm counts"
+                  #, column_title = "Absolute values"
+                  #, cluster_columns = as.dendrogram(my.tree)
+               ,cluster_columns = F
+               , cluster_rows =F
+               , top_annotation = haCol1
+               , row_names_gp = grid::gpar(fontsize = 6)
+                  , show_column_names = F
+                  , show_row_names = T
+                  )
+   ComplexHeatmap::draw(ht21)
+   }
+  if (!is.logical(mean_profile)) {
+    stop("Parameter mean_profile must be logical")
+  }
   }
 
 ```
@@ -1504,7 +2072,20 @@ heatmap_markers_vitro_mean_profile <- function(norm_vitro, marker_plot, cluster_
 ```
 
 ```{r }
-heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, color_vector = NULL)
+heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, median_profile = FALSE, color_vector = NULL)
+```
+```{r }
+heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, median_profile = TRUE, color_vector = NULL)
+```
+
+```{r }
+
+heatmap_markers_vitro(norm_vitro,common_genes, cluster_vitro, mean_profile = FALSE,color_vector = NULL)
+```
+
+```{r }
+
+heatmap_markers_vitro(norm_vitro,common_genes, cluster_vitro, mean_profile = TRUE,color_vector = NULL)
 ```
 
 ```{r }
