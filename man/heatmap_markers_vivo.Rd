@@ -10,6 +10,7 @@ heatmap_markers_vivo(
   selected_stages,
   max_number = 10,
   cluster_vivo,
+  median_profile = FALSE,
   color_vector = NULL
 )
 }
@@ -23,6 +24,8 @@ heatmap_markers_vivo(
 \item{max_number}{Integer. Maximum number of genes to show for each \emph{selected_stages}.}
 
 \item{cluster_vivo}{cluster for in vivo dataset}
+
+\item{median_profile}{Logical value. If TRUE, then the median expression profile for the given markers in each stage is shown}
 
 \item{color_vector}{Character vector with colour assignment.}
 }
