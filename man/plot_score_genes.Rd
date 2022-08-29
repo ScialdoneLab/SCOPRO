@@ -15,7 +15,8 @@ plot_score_genes(
   final_name,
   max_size = 9,
   text_size = 9.5,
-  title_name
+  title_name,
+  norm_expression = FALSE
 )
 }
 \arguments{
@@ -40,9 +41,12 @@ plot_score_genes(
 \item{text_size}{Numeric value, specifying the size of the text in the plot.}
 
 \item{title_name}{Character value.}
+
+\item{norm_expression}{Logical. If TRUE, for a given gene, the average expression is computed in each cluster. Finally, for each cluster, the average expression of the genes are normalised (divide by the maximum average expression). The color of each dot is the normalised average expression.
+If FALSE, the color is the average expression of the gene in the corresponding cluster.}
 }
 \value{
-ggplot2::ggplot2 object showing balloon plot.
+ggplot2::ggplot2 object showing balloon plot.The size of the dot is given by the fraction of cells with log2 normalise expression above 0.1
 }
 \description{
 plot_score_genes

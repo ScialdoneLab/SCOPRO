@@ -39,7 +39,8 @@ List with empirical p values
 For each cluster, a centroid is defined as the mean expression value of \emph{marker_stages_filter} across cells in the cluster.
 Comparison of in vitro and in vivo is done starting from a distance matrix based on spearman correlation between cluster centroid.
 For a cluster A in the in vitro dataset, the Spearman’s correlation based distance between the cells and its centroid is computed. These values define an empirical distribution. The Spearman’s correlation based distance between the centroid of cluster A in the in vitro dataset and centroid of cluster B in the in vivo dataset is also computed.  An empirical p value is assigned to cluster B, from the comparison with the empirical distribution.
-The distance between a pair of clusters is significant if the empirical p value above defined is smaller or equal to \emph{p_value}
+For each pair of cluster A and B the final empirical p value is defined as the maximum between the empirical p value assigned to B and the empirical p value assigned to A.
+The distance between a pair of clusters is significant if the empirical p value above defined is smaller than \emph{p_value}.
 }
 \author{
 Gabriele Lubatti \email{gabriele.lubatti@helmholtz-muenchen.de}

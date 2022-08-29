@@ -12,7 +12,9 @@ plot_distance_vivo_vitro(
   marker_stages_filter,
   norm_vitro,
   cluster_vitro,
-  text_size = 10
+  text_size = 10,
+  show_significance = FALSE,
+  p_value = 0.1
 )
 }
 \arguments{
@@ -31,6 +33,10 @@ plot_distance_vivo_vitro(
 \item{cluster_vitro}{cluster for in vitro dataset}
 
 \item{text_size}{Integer number specifyng the size of the text.}
+
+\item{show_significance}{Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shwown if the empirical p value is below \emph{p_value}}
+
+\item{p_value}{Numeric value.}
 }
 \value{
 Heatmap class object
