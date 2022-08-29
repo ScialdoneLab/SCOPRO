@@ -199,6 +199,34 @@ difference_significance_vitro_single <- function(norm_vitro, mean_profile_vitro,
   return(empirical_p_value)
 }
 
+#' difference_significance_vivo_single
+#' @noRd
+#'
+difference_significance_vivo_single <- function(norm_vivo, mean_profile_vivo, mean_profile_vitro, p_value, name_vivo, genes_all, cluster_vivo, selected_stages_vitro){
+  norm_vitro_4 <- norm_vivo[genes_all,cluster_vivo == name_vivo]
+  mean_profile_vitro_cluster <- mean_profile_vivo[[which(levels(factor(cluster_vivo)) == name_vivo)]]
+  norm_vitro_4_4 <- cbind(norm_vitro_4,mean_profile_vitro_cluster)
+  dissimilarity_4_4 <- sqrt((1-cor((norm_vitro_4_4), method = "spearman"))/2)
+  number_cluster <- selected_stages_vitro
+  empirical_p_value <- rep(list(0),length(number_cluster))
+  for (i in 1:length(number_cluster)){
+    norm_vitro_4_2 <- cbind(norm_vitro_4,mean_profile_vitro[[i]])
+    norm_vitro_4_2 <- cbind(norm_vitro_4,mean_profile_vitro[[i]])
+    dissimilarity_4_2 <- sqrt((1-cor((norm_vitro_4_2), method = "spearman"))/2)
+    mean_4_2 <- mean(dissimilarity_4_2[, length(colnames(dissimilarity_4_4))])
+    limit <- as.numeric(quantile(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))], probs=c(0, 1-p_value)))
+    if (mean_4_2<limit[1] | mean_4_2>limit[2]){
+      print("Difference statistically significant")
+    }
+    else{
+      print("Difference not statistically significant")
+    }
+    empirical_p_value_one <- sum(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))] > mean_4_2) / length(dissimilarity_4_4[, length(colnames(dissimilarity_4_4))])
+    empirical_p_value[[i]]=empirical_p_value_one
+  }
+  return(empirical_p_value)
+}
+
 
 
 #' download_example_data

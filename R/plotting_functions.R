@@ -10,8 +10,10 @@
 #' @param max_size Numeric value, specifying the size of the dot.
 #' @param text_size Numeric value, specifying the size of the text in the plot.
 #' @param title_name Character value.
+#' @param norm_expression Logical. If TRUE, for a given gene, the average expression is computed in each cluster. Finally, for each cluster, the average expression of the genes are normalised (divide by the maximum average expression). The color of each dot is the normalised average expression.
+#' If FALSE, the color is the average expression of the gene in the corresponding cluster.
 
-#' @return ggplot2::ggplot2 object showing balloon plot.
+#' @return ggplot2::ggplot2 object showing balloon plot.The size of the dot is given by the fraction of cells with log2 normalise expression above 0.1
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #'
 #'
@@ -20,7 +22,7 @@
 #'
 
 
-plot_score_genes <- function(markers_to_plot ,label_1, label_2, norm_vitro,norm_vivo, cluster_vitro,cluster_vivo, final_name, max_size = 9, text_size= 9.5, title_name)
+plot_score_genes <- function(markers_to_plot ,label_1, label_2, norm_vitro,norm_vivo, cluster_vitro,cluster_vivo, final_name, max_size = 9, text_size= 9.5, title_name, norm_expression = FALSE)
 {
 
   markers_to_plot <- markers_to_plot[markers_to_plot %in% row.names(norm_vitro)]
@@ -39,7 +41,7 @@ plot_score_genes <- function(markers_to_plot ,label_1, label_2, norm_vitro,norm_
   cluster_vivo_name <- paste(label_2, factor(cluster_vivo), sep="-")
   mouse_norm_common <- cbind(norm_vitro[markers_to_plot, ], norm_vivo[markers_to_plot, ])
   label_mouse <- c(cluster_vitro_name, cluster_vivo_name)
-  out_2 <- plot_balons(mouse_norm_common, label_mouse,markers_to_plot, length(markers_to_plot), length(colnames(mouse_norm_common)), max_size = max_size,text_size = text_size, all_markers_common_name, keep_order = FALSE)
+  out_2 <- plot_balons(mouse_norm_common, label_mouse,markers_to_plot, length(markers_to_plot), length(colnames(mouse_norm_common)), max_size = max_size,text_size = text_size, all_markers_common_name, keep_order = FALSE, norm_expression = norm_expression)
   out_2 <- out_2 + ggplot2::ggtitle(title_name)
 
   return(out_2)
@@ -118,48 +120,111 @@ plot_score_sc <- function (SCOPRO_output, cluster_vitro, marker_stages, marker_s
 #' plot_balons
 #' @noRd
 #'
-plot_balons <- function(norm_counts, final_cluster, genes_to_plot, max_number, total_cells, max_size=5, text_size=7,label_final, keep_order=TRUE){
-
-  fattore <- factor(final_cluster,levels=unique(final_cluster))
-  if (keep_order == FALSE){
-    fattore <- factor(final_cluster)}
-  livelli <- levels(factor(fattore))
-
-
-
-  all_markers <- genes_to_plot
-
-  all_markers <- lapply(all_markers, function(x) {x[x!=0]})
-
-
-  all_markers_values <- rep(list(0),length(livelli))
-  for ( i in 1:length(livelli)){
-    gene_values_0 <- apply(norm_counts[genes_to_plot,final_cluster==livelli[i]], 1, mean)
-    all_markers_values[[i]] <- gene_values_0
+plot_balons <- function (norm_counts, final_cluster, genes_to_plot, max_number,
+                         total_cells, max_size = 5, text_size = 7, label_final, keep_order = TRUE, norm_expression = FALSE)
+{
+  fattore <- factor(final_cluster, levels = unique(final_cluster))
+  if (!is.logical(keep_order)){
+    stop("parameter keep_order must be logical")
   }
-
-
-  values <- rep(list(0),length(livelli))
-  for ( i in 1:length(livelli)){
-    valore=apply(norm_counts[genes_to_plot,final_cluster==livelli[i]],1,function(x){sum(x>0.1)/length(x)})
-    values[[i]]=valore
+  if (keep_order == FALSE) {
+    fattore <- factor(final_cluster)
   }
-
-  cluster_label_all=rep(list(0),length(livelli))
-  for ( i in 1:length(livelli)){
-    cluster_label_all[[i]] <- rep(livelli[i],length(genes_to_plot))
+  if (!is.logical(norm_expression)){
+    stop("parameter norm_expression must be logical")
   }
+  if (norm_expression == FALSE){
+    livelli <- levels(factor(fattore))
+    all_markers <- genes_to_plot
+    all_markers <- lapply(all_markers, function(x) {
+      x[x != 0]
+    })
+    all_markers_values <- rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      gene_values_0 <- apply(norm_counts[genes_to_plot, final_cluster ==
+                                           livelli[i]], 1, mean)
+      all_markers_values[[i]] <- gene_values_0
+    }
+    values <- rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      valore = apply(norm_counts[genes_to_plot, final_cluster ==
+                                   livelli[i]], 1, function(x) {
+                                     sum(x > 0.1)/length(x)
+                                   })
+      values[[i]] = valore
+    }
+    cluster_label_all = rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      cluster_label_all[[i]] <- rep(livelli[i], length(genes_to_plot))
+    }
+    all_markers_plot <- genes_to_plot
+    cluster_label_all <- unlist(cluster_label_all)
+    values <- unlist(values)
+    all_markers_values <- unlist(all_markers_values)
+    balloon_melted <- data.frame(all_markers_plot, cluster_label_all,
+                                 values, label_final)
+    colnames(balloon_melted) <- c("genes_plot", "cluster_label_all",
+                                  "values", "label_all_final")
+    p <- ggplot2::ggplot(balloon_melted, ggplot2::aes(x = factor(cluster_label_all,
+                                                                 levels = unique(cluster_label_all)), y = factor(balloon_melted[,
+                                                                                                                                4], levels = (unique(label_final))))) + ggplot2::geom_point(ggplot2::aes(size = values, colour = as.numeric(all_markers_values))) + ggplot2::theme(panel.background = ggplot2::element_blank(),
+                     panel.border = ggplot2::element_rect(colour = "blue",
+                                                          fill = NA, size = 3)) + ggplot2::scale_size_area(max_size = max_size) +
+      ggplot2::scale_colour_gradient(low = "grey", high = "brown",
+                                     na.value = NA) + ggplot2::labs(colour = "Mean", size = "Value") +
+      ggplot2::xlab("Cluster") + ggplot2::ylab("Markers") +
+      ggplot2::theme(text = ggplot2::element_text(size = text_size),
+                     axis.text.x = ggplot2::element_text(angle = 45, vjust = 1,
+                                                         hjust = 1), axis.title.x = ggplot2::element_blank())
+    return(p)
 
-
-  all_markers_plot <- genes_to_plot
-  cluster_label_all <- unlist(cluster_label_all)
-  values <- unlist(values)
-  all_markers_values <- unlist(all_markers_values)
-  balloon_melted <- data.frame(all_markers_plot,cluster_label_all,values,label_final)
-  colnames(balloon_melted) <- c("genes_plot","cluster_label_all","values","label_all_final")
-
-  p <- ggplot2::ggplot(balloon_melted, ggplot2::aes(x =factor(cluster_label_all,levels=unique(cluster_label_all)), y = factor(balloon_melted[,4],levels=(unique(label_final)))))
-  p + ggplot2::geom_point( ggplot2::aes(size=values,colour=as.numeric(all_markers_values))) + ggplot2::theme(panel.background=ggplot2::element_blank(), panel.border = ggplot2::element_rect(colour = "blue", fill=NA, size=3))+ggplot2::scale_size_area(max_size=max_size)+ ggplot2::scale_colour_gradient(low = "grey", high = "brown", na.value = NA)+ggplot2::labs(colour="Mean",size="Value")+ggplot2::xlab("Cluster")+ggplot2::ylab("Markers")+ggplot2::theme(text = ggplot2::element_text(size=text_size),axis.text.x = ggplot2::element_text(angle=45,vjust=1,hjust=1),axis.title.x=ggplot2::element_blank())
+  }
+  if (norm_expression == TRUE){
+    livelli <- levels(factor(fattore))
+    all_markers <- genes_to_plot
+    all_markers <- lapply(all_markers, function(x) {
+      x[x != 0]
+    })
+    all_markers_values <- rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      gene_values_0 <- apply(norm_counts[genes_to_plot, final_cluster ==
+                                           livelli[i]], 1, mean)
+      all_markers_values[[i]] <- gene_values_0/max(gene_values_0)
+    }
+    values <- rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      valore = apply(norm_counts[genes_to_plot, final_cluster ==
+                                   livelli[i]], 1, function(x) {
+                                     sum(x > 0.1)/length(x)
+                                   })
+      values[[i]] = valore
+    }
+    cluster_label_all = rep(list(0), length(livelli))
+    for (i in 1:length(livelli)) {
+      cluster_label_all[[i]] <- rep(livelli[i], length(genes_to_plot))
+    }
+    all_markers_plot <- genes_to_plot
+    cluster_label_all <- unlist(cluster_label_all)
+    values <- unlist(values)
+    all_markers_values <- unlist(all_markers_values)
+    balloon_melted <- data.frame(all_markers_plot, cluster_label_all,
+                                 values, label_final)
+    colnames(balloon_melted) <- c("genes_plot", "cluster_label_all",
+                                  "values", "label_all_final")
+    p <- ggplot2::ggplot(balloon_melted, ggplot2::aes(x = factor(cluster_label_all,
+                                                                 levels = unique(cluster_label_all)), y = factor(balloon_melted[,
+                                                                                                                                4], levels = (unique(label_final))))) + ggplot2::geom_point(ggplot2::aes(size = values, colour = as.numeric(all_markers_values))) +
+      ggplot2::theme(panel.background = ggplot2::element_blank(),
+                     panel.border = ggplot2::element_rect(colour = "blue",
+                                                          fill = NA, size = 3)) + ggplot2::scale_size_area(max_size = max_size) +
+      ggplot2::scale_colour_gradient(low = "grey", high = "brown",
+                                     na.value = NA) + ggplot2::labs(colour = "Mean", size = "Value") +
+      ggplot2::xlab("Cluster") + ggplot2::ylab("Markers") +
+      ggplot2::theme(text = ggplot2::element_text(size = text_size),
+                     axis.text.x = ggplot2::element_text(angle = 45, vjust = 1,
+                                                         hjust = 1), axis.title.x = ggplot2::element_blank())
+    return(p)
+  }
 }
 
 
@@ -1074,7 +1139,8 @@ plot_barplot <- function(obj, method, cluster_vitro, threshold, fraction = TRUE)
 #' @description For each cluster, a centroid is defined as the mean expression value of \emph{marker_stages_filter} across cells in the cluster.
 #' Comparison of in vitro and in vivo is done starting from a distance matrix based on spearman correlation between cluster centroid.
 #' For a cluster A in the in vitro dataset, the Spearman’s correlation based distance between the cells and its centroid is computed. These values define an empirical distribution. The Spearman’s correlation based distance between the centroid of cluster A in the in vitro dataset and centroid of cluster B in the in vivo dataset is also computed.  An empirical p value is assigned to cluster B, from the comparison with the empirical distribution.
-#' The distance between a pair of clusters is significant if the empirical p value above defined is smaller or equal to \emph{p_value}
+#' For each pair of cluster A and B the final empirical p value is defined as the maximum between the empirical p value assigned to B and the empirical p value assigned to A.
+#' The distance between a pair of clusters is significant if the empirical p value above defined is smaller than \emph{p_value}.
 
 #'
 #' @export difference_significance_vitro
@@ -1098,30 +1164,42 @@ difference_significance_vitro <- function(norm_vitro, p_value = 0.10, marker_sta
   marker_all <- unlist(marker_stages_top)
   marker_all <- marker_all[marker_all%in%marker_stages_filter]
   genes_all <- marker_all
-
-  mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes_all, method = "mean")
-
-  selected_stages_vitro = levels(factor(cluster_vitro))
+  selected_stages_vivo <- levels(factor(cluster_vivo))
+  mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages_vivo, norm_vivo, genes_all, method = "mean")
+  selected_stages_vitro <- levels(factor(cluster_vitro))
   mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes_all, method = "mean")
-
-
   name_vitro <- levels(factor(cluster_vitro))
   difference_vitro <- rep(list(0),length(name_vitro))
+  difference_vivo <- rep(list(0),length(selected_stages_vivo))
   for ( i in 1:length(name_vitro)){
-    difference_vitro[[i]] <- difference_significance_vitro_single(norm_vitro,mean_profile_vitro, mean_profile_vivo, p_value = 0.10, name_vitro = name_vitro[i], genes_all, cluster_vitro, selected_stages)
-    if (sum(difference_vitro[[i]] < p_value)){
+    difference_vitro[[i]] <- difference_significance_vitro_single(norm_vitro,mean_profile_vitro, mean_profile_vivo, p_value = p_value, name_vitro = name_vitro[i], genes_all, cluster_vitro, selected_stages_vivo)
+    if (all(difference_vitro[[i]] < p_value)){
       logic_index = which(difference_vitro[[i]] > p_value)
-      cluster_vivo_different = selected_stages[logic_index]
-      print(paste0("In vitro cluster ", name_vitro[i]," is different from in vivo clusters", cluster_vivo_different))
+      cluster_vivo_different = selected_stages_vivo[logic_index]
+      print(paste0("In vitro cluster ", name_vitro[i]," is different from all in vivo clusters"))
     }
     else{
       print(paste0("In vitro cluster ", name_vitro[i]," is not different from all in vivo clusters"))
     }
-    names(difference_vitro[[i]]) = selected_stages
+    names(difference_vitro[[i]]) = selected_stages_vivo
   }
   names(difference_vitro) = name_vitro
-  return(difference_vitro)
+  for ( i in 1:length(selected_stages_vivo)){
+    difference_vivo[[i]] <- difference_significance_vivo_single(norm_vivo, mean_profile_vivo, mean_profile_vitro, p_value = p_value, selected_stages_vivo[i], genes_all, cluster_vivo, selected_stages_vitro)
+    if (all(difference_vivo[[i]] < p_value)){
+      logic_index = which(difference_vivo[[i]] > p_value)
+      cluster_vitro_different = selected_stages_vitro[logic_index]
+      print(paste0("In vivo cluster ", selected_stages_vivo[i]," is different from all in vitro clusters"))
+    }
+    else{
+      print(paste0("In vivo cluster ", selected_stages_vivo[i]," is not different from all in vitro clusters"))
+    }
+    names(difference_vivo[[i]]) = selected_stages_vitro
+  }
+  names(difference_vivo) = selected_stages_vivo
+  return(list(difference_vitro, difference_vivo))
 }
+
 
 
 
@@ -1132,8 +1210,10 @@ difference_significance_vitro <- function(norm_vitro, p_value = 0.10, marker_sta
 #' @inheritParams plot_in_vivo_markers
 #' @inheritParams heatmap_markers_vivo
 #' @inheritParams heatmap_markers_vitro
+#' @inheritParams difference_significance_vitro
 #' @inheritParams plot_score_genes_heatmap
 #' @param text_size Integer number specifyng the size of the text.
+#' @param show_significance Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shwown if the empirical p value is below \emph{p_value}
 #' @return Heatmap class object
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}
@@ -1147,70 +1227,121 @@ difference_significance_vitro <- function(norm_vitro, p_value = 0.10, marker_sta
 
 
 
-plot_distance_vivo_vitro <- function(norm_vivo, cluster_vivo, selected_stages, marker_stages, marker_stages_filter, norm_vitro, cluster_vitro, text_size = 10){
-  if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
-    stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
-  }
-  for (i in selected_stages){
-    index_specific <- which(selected_stages %in% i)
-    marker_specific <- marker_stages[[index_specific]]
-    if (length(marker_specific) == 0) {
-      stop(paste0("There are no markers for the stage: ", i))
+plot_distance_vivo_vitro <- function(norm_vivo, cluster_vivo, selected_stages, marker_stages, marker_stages_filter, norm_vitro, cluster_vitro, text_size = 10, show_significance = FALSE, p_value = 0.10){
+  if (show_significance == FALSE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
     }
+    for (i in selected_stages){
+      index_specific <- which(selected_stages %in% i)
+      marker_specific <- marker_stages[[index_specific]]
+      if (length(marker_specific) == 0) {
+        stop(paste0("There are no markers for the stage: ", i))
+      }
+    }
+    marker_stages_top <- rep(list(0),length(selected_stages))
+    for (i in 1:length(selected_stages)){
+      marker_stages_top[[i]] = marker_stages[[i]]
+    }
+    marker_all <- unlist(marker_stages_top)
+    marker_all <- marker_all[marker_all%in%marker_stages_filter]
+    genes <- marker_all
+    mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes, method = "mean")
+    selected_stages_vitro = levels(factor(cluster_vitro))
+    mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes, method = "mean")
+    median_vivo <- matrix(unlist(mean_profile_vivo), ncol = length(mean_profile_vivo), byrow = FALSE)
+    median_vitro <- matrix(unlist(mean_profile_vitro), ncol = length(mean_profile_vitro), byrow = FALSE)
+    median_all_matrix <- cbind(median_vivo, median_vitro)
+    names_vivo <- rep(0,length(mean_profile_vivo))
+    for ( i in 1:length(mean_profile_vivo)){
+      j <- selected_stages[i]
+      names_vivo[i]=paste0("In vivo-",j)}
+    names_vitro=rep(0,length(mean_profile_vitro))
+    for ( i in 1:length(mean_profile_vitro)){
+      j=selected_stages_vitro[i]
+      names_vitro[i]=paste0("In vitro-",j)}
+    colnames(median_all_matrix)=c(names_vivo,names_vitro)
+    median_all_matrix<-as.matrix(median_all_matrix)
+    dissimilarity <- sqrt((1-cor((median_all_matrix), method = "spearman"))/2)
+    my.dist <- as.dist(dissimilarity)
+    dist_mouse=as.matrix(my.dist)
+    dist_mouse=dist_mouse[grepl("In vivo-",row.names(dist_mouse)),grepl("In vitro-",row.names(dist_mouse))]
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(dist_mouse),
+                                    cluster_rows = TRUE, col = circlize::colorRamp2(c(round(min(dist_mouse),2),
+                                                                                      round(max(dist_mouse),2)), c("grey", "brown")),
+                                    name = "spearman distance", cluster_columns = TRUE,
+                                    row_names_gp = grid::gpar(fontsize = text_size), show_column_names = TRUE,
+                                    show_row_names = TRUE)
+    ComplexHeatmap::draw(ht21)
   }
-  marker_stages_top <- rep(list(0),length(selected_stages))
-  for (i in 1:length(selected_stages)){
-    marker_stages_top[[i]] = marker_stages[[i]]
+  if (show_significance == TRUE){
+    if (sum(!unlist(lapply(list(c("ComplexHeatmap","circlize")),requireNamespace, quietly = TRUE)))>0) {
+      stop("Package circlize and ComplexHeatmap needed for this function to work. Please install them: install.packages('circlize') and BiocManager::install('ComplexHeatmap')")
+    }
+    for (i in selected_stages){
+      index_specific <- which(selected_stages %in% i)
+      marker_specific <- marker_stages[[index_specific]]
+      if (length(marker_specific) == 0) {
+        stop(paste0("There are no markers for the stage: ", i))
+      }
+    }
+    marker_stages_top <- rep(list(0),length(selected_stages))
+    for (i in 1:length(selected_stages)){
+      marker_stages_top[[i]] = marker_stages[[i]]
+    }
+    marker_all <- unlist(marker_stages_top)
+    marker_all <- marker_all[marker_all%in%marker_stages_filter]
+    genes <- marker_all
+    mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes, method = "mean")
+    selected_stages_vitro = levels(factor(cluster_vitro))
+    mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes, method = "mean")
+    median_vivo <- matrix(unlist(mean_profile_vivo), ncol = length(mean_profile_vivo), byrow = FALSE)
+    median_vitro <- matrix(unlist(mean_profile_vitro), ncol = length(mean_profile_vitro), byrow = FALSE)
+    median_all_matrix <- cbind(median_vivo, median_vitro)
+    names_vivo <- rep(0,length(mean_profile_vivo))
+    for ( i in 1:length(mean_profile_vivo)){
+      j <- selected_stages[i]
+      names_vivo[i] <- paste0("In vivo-",j)}
+    names_vitro <- rep(0,length(mean_profile_vitro))
+    for ( i in 1:length(mean_profile_vitro)){
+      j=selected_stages_vitro[i]
+      names_vitro[i]=paste0("In vitro-",j)}
+    colnames(median_all_matrix)=c(names_vivo,names_vitro)
+    median_all_matrix <- as.matrix(median_all_matrix)
+    dissimilarity <- sqrt((1-cor((median_all_matrix), method = "spearman"))/2)
+    my.dist <- as.dist(dissimilarity)
+    dist_mouse=as.matrix(my.dist)
+    dist_mouse=dist_mouse[grepl("In vivo-",row.names(dist_mouse)),grepl("In vitro-",row.names(dist_mouse))]
+    difference_vitro_vivo <-
+      difference_significance_vitro(norm_vitro,p_value,marker_stages, marker_stages_filter, cluster_vitro, cluster_vivo, selected_stages, norm_vivo)
+    dist_vitro <- matrix(unlist(difference_vitro_vivo[[1]]), ncol = length(difference_vitro_vivo[[1]]), byrow = FALSE)
+    colnames(dist_vitro) = names(difference_vitro_vivo[[1]])
+    dist_vivo <- matrix(unlist(difference_vitro_vivo[[2]]), nrow = length(difference_vitro_vivo[[2]]), byrow = TRUE)
+    row.names(dist_vivo) = names(difference_vitro_vivo[[2]])
+    dist_final = matrix(0,ncol= length(difference_vitro_vivo[[1]]), nrow = length(difference_vitro_vivo[[2]]))
+    for (j in 1:length(colnames(dist_vitro))){
+      for (i in 1:length(row.names(dist_vivo))){
+        dist_final[i,j] <- max(dist_vitro[i,j],dist_vivo[i,j])
+      }
+    }
+    colnames(dist_final) <- paste0("In vitro-",names(difference_vitro_vivo[[1]]))
+    row.names(dist_final) <- paste0("In vivo-",names(difference_vitro_vivo[[2]]))
+    dist_final <- dist_final[row.names(dist_mouse), colnames(dist_mouse)]
+    ht21 <- ComplexHeatmap::Heatmap(as.matrix(dist_mouse),
+                                    cluster_rows = TRUE, col = circlize::colorRamp2(c(round(min(dist_mouse),2),
+                                                                                      round(max(dist_mouse),2)), c("grey", "brown")),
+                                    name = "spearman distance", cluster_columns = TRUE,
+                                    row_names_gp = grid::gpar(fontsize = text_size), show_column_names = TRUE,
+                                    show_row_names = TRUE, cell_fun = function(j, i, x, y, w, h, fill) {
+
+                                      if((dist_final[i,j]) < p_value) {
+                                        grid::grid.text("*", x, y)
+                                      }
+
+                                    })
+    ComplexHeatmap::draw(ht21)
   }
-  marker_all <- unlist(marker_stages_top)
-
-  marker_all <- marker_all[marker_all%in%marker_stages_filter]
-  genes <- marker_all
-  mean_profile_vivo <- find_mean_cluster(cluster_vivo, selected_stages, norm_vivo, genes, method = "mean")
-
-  selected_stages_vitro = levels(factor(cluster_vitro))
-  mean_profile_vitro <- find_mean_cluster(cluster_vitro, selected_stages_vitro, norm_vitro, genes, method = "mean")
-
-
-  median_vivo <- matrix(unlist(mean_profile_vivo), ncol = length(mean_profile_vivo), byrow = FALSE)
-  median_vitro <- matrix(unlist(mean_profile_vitro), ncol = length(mean_profile_vitro), byrow = FALSE)
-
-  median_all_matrix=cbind(median_vivo, median_vitro)
-  names_vivo=rep(0,length(mean_profile_vivo))
-  for ( i in 1:length(mean_profile_vivo)){
-    j=selected_stages[i]
-    names_vivo[i]=paste0("In vivo-",j)}
-
-  names_vitro=rep(0,length(mean_profile_vitro))
-  for ( i in 1:length(mean_profile_vitro)){
-    j=selected_stages_vitro[i]
-    names_vitro[i]=paste0("In vitro-",j)}
-
-  colnames(median_all_matrix)=c(names_vivo,names_vitro)
-
-
-
-  median_all_matrix<-as.matrix(median_all_matrix)
-  dissimilarity <- sqrt((1-cor((median_all_matrix), method = "spearman"))/2)
-
-  my.dist <- as.dist(dissimilarity)
-
-
-  dist_mouse=as.matrix(my.dist)
-  dist_mouse=dist_mouse[grepl("In vivo-",row.names(dist_mouse)),grepl("In vitro-",row.names(dist_mouse))]
-
-
-
-
-  ht21 <- ComplexHeatmap::Heatmap(as.matrix(dist_mouse),
-                                  cluster_rows = TRUE, col = circlize::colorRamp2(c(round(min(dist_mouse),2),
-                                                                                    round(max(dist_mouse),2)), c("grey", "brown")),
-                                  name = "spearman distance", cluster_columns = TRUE,
-                                  row_names_gp = grid::gpar(fontsize = text_size), show_column_names = TRUE,
-                                  show_row_names = TRUE)
-  ComplexHeatmap::draw(ht21)
-
-
 }
+
 
 
