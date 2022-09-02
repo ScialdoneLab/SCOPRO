@@ -19,9 +19,9 @@ plot_qc_cluster(
 
 \item{mit_prefix}{Character name. Starting letters to identify mitochondrial genes}
 
-\item{rib_prefix_1}{Character name. Starting letters to identify ribosomial genes}
+\item{rib_prefix_1}{Character name. Starting letters to identify ribosomal genes}
 
-\item{rib_prefix_2}{Character name. Starting letters to identify ribosomial genes}
+\item{rib_prefix_2}{Character name. Starting letters to identify ribosomal genes}
 }
 \value{
 ggplot2 object.

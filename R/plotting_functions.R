@@ -234,12 +234,12 @@ plot_balons <- function (norm_counts, final_cluster, genes_to_plot, max_number,
 #' @inheritParams select_top_markers
 #' @inheritParams  select_common_genes
 #' @inheritParams plot_score_genes
-#' @description All the stages in \emph{cluster_vivo_factor} are showns in the balloon plot
+#' @description All the stages in \emph{cluster_vivo_factor} are shown the balloon plot
 #' @param obj Seurat object given as output from function \emph{findCellTypesSeurat}
-#' @param cluster_vivo_factor Factor vector specifyng the cluster partition of the in vivo datataset
-#' @param order_label_vivo Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}
-#' @param label_size Numeric value specifyng the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.
-#' @param thresold Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned. Only used when \emph{method} is Seurat
+#' @param cluster_vivo_factor Factor vector specifying the cluster partition of the in vivo datataset
+#' @param order_label_vivo Character vector specifying the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}
+#' @param label_size Numeric value specifying the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.
+#' @param threshold Numeric value. Cells with a predicted score below or equal to \emph{threshold} are labelled as unassigned. Only used when \emph{method} is Seurat
 #' @param method Character name. Must be one of Seurat, scibetR or scmap
 
 #' @return  balloon plot given by function \emph{balloonplot} from package \emph{gplots}
@@ -250,13 +250,13 @@ plot_balons <- function (norm_counts, final_cluster, genes_to_plot, max_number,
 #' @export cellTypesPerClusterBalloonPlot
 #' @seealso \url{https://CRAN.R-project.org/package=gplots}
 
-cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_label_vivo, method = "Seurat", title_name, text_size = 0.4, label_size = 0.4, thresold = 0.5)
+cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_label_vivo, method = "Seurat", title_name, text_size = 0.4, label_size = 0.4, threshold = 0.5)
 {if (method == "Seurat"){
   if (!(requireNamespace("gplots", quietly = TRUE))) {
     stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
   }
   obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <=
-                               thresold] <- "Unassigned"
+                               threshold] <- "Unassigned"
   levels_vitro <- c(levels(cluster_vivo_factor))
   levels_vitro_factor <- factor(levels_vitro, levels = order_label_vivo)
   if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
@@ -342,7 +342,7 @@ cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_labe
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #'
 #'
-#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are showns in the balloon plot
+#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are shown the balloon plot
 #' @export cellTypesPerClusterBalloonPlot_small
 #' @seealso \url{https://CRAN.R-project.org/package=gplots}
 
@@ -350,13 +350,13 @@ cellTypesPerClusterBalloonPlot <- function (obj, cluster_vivo_factor, order_labe
 
 
 cellTypesPerClusterBalloonPlot_small <- function (obj, cluster_vivo_factor, order_label_vivo, title_name, method = "Seurat",text_size = 0.4,
-                                                  label_size = 0.7, thresold = 0.5)
+                                                  label_size = 0.7, threshold = 0.5)
 {
   if (method == "Seurat"){
     if (!(requireNamespace("gplots", quietly = TRUE))) {
       stop("Package gplots needed for this function to work. Please install it: install.packages('gplots')")
     }
-    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= thresold] <- "Unassigned"
+    obj@meta.data$predicted.id[obj@meta.data$prediction.score.max <= threshold] <- "Unassigned"
     levels_vitro <- c(levels(cluster_vivo_factor))
     levels_vitro_factor <- factor(levels_vitro, levels = c(order_label_vivo))
     if (sum(obj@meta.data$predicted.id == "Unassigned") > 0) {
@@ -439,7 +439,7 @@ cellTypesPerClusterBalloonPlot_small <- function (obj, cluster_vivo_factor, orde
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #'
 #'
-#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are showns in the balloon plot
+#' @description Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are shown the balloon plot
 #' @export plot_boxplot
 #' @seealso \url{https://CRAN.R-project.org/package=gplots}
 
@@ -464,7 +464,7 @@ plot_boxplot <- function(norm_vivo, gene_name, cluster_vivo, order_label_vivo, t
 #' @inheritParams plot_score_genes
 #' @param coordinate_umap data frame with umap coordinates (UMAP 1 and UMAP2).
 #' @param threshold Numeric value.
-#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are epxressed above \emph{threshold}
+#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are expressed above \emph{threshold}
 #' @return ggplot2::ggplot2 object.
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #'
@@ -505,7 +505,7 @@ plot_in_vivo_markers <- function (coordinate_umap, norm_vitro, marker_stages, se
 #' @param max_x Set the max limit on the x axis.
 #' @param min_y Set the min limit on the y axis.
 #' @param max_y Set the min limit on the y axis.
-#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are epxressed above \emph{threshold}.
+#' @description Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are expressed above \emph{threshold}.
 #' It is based on plotly library.
 #' @return plotly object given by \emph{plot_ly function} (from library \emph{plotly}).
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
@@ -969,7 +969,7 @@ plot_score_genes_heatmap <- function(norm_vivo, cluster_vivo, norm_vitro, cluste
 #' plot_umap
 #' @param coordinate_umap Data frame with dimensionality reduction coordinates.
 #' Number of rows must be equal to the number of cells
-#' @param cluster Vector with cluster assignment. The length must be qual to the number of cells
+#' @param cluster Vector with cluster assignment. The length must be equal to the number of cells
 #' @return ggplot2 object.
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #' @seealso \url{https://CRAN.R-project.org/package=ggplot2}
@@ -1021,8 +1021,8 @@ plot_gene <- function(norm_matrix, coordinate_umap, gene_id, title_name){
 #'
 #' @param seurat_object Output of the function \emph{create_seurat_object}
 #' @param mit_prefix Character name. Starting letters to identify mitochondrial genes
-#' @param rib_prefix_1 Character name. Starting letters to identify ribosomial genes
-#' @param rib_prefix_2 Character name. Starting letters to identify ribosomial genes
+#' @param rib_prefix_1 Character name. Starting letters to identify ribosomal genes
+#' @param rib_prefix_2 Character name. Starting letters to identify ribosomal genes
 #' @inheritParams SCOPRO
 #' @return ggplot2 object.
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
@@ -1212,8 +1212,8 @@ difference_significance_vitro <- function(norm_vitro, p_value = 0.10, marker_sta
 #' @inheritParams heatmap_markers_vitro
 #' @inheritParams difference_significance_vitro
 #' @inheritParams plot_score_genes_heatmap
-#' @param text_size Integer number specifyng the size of the text.
-#' @param show_significance Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shwown if the empirical p value is below \emph{p_value}
+#' @param text_size Integer number specifying the size of the text.
+#' @param show_significance Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shown if the empirical p value is below \emph{p_value}
 #' @return Heatmap class object
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #' @seealso \url{https://www.rdocumentation.org/packages/ComplexHeatmap/versions/1.10.2/topics/Heatmap}

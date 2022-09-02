@@ -32,9 +32,9 @@ plot_distance_vivo_vitro(
 
 \item{cluster_vitro}{cluster for in vitro dataset}
 
-\item{text_size}{Integer number specifyng the size of the text.}
+\item{text_size}{Integer number specifying the size of the text.}
 
-\item{show_significance}{Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shwown if the empirical p value is below \emph{p_value}}
+\item{show_significance}{Logical. If TRUE the function \emph{difference_significance_vitro} is run and an asterisk is shown if the empirical p value is below \emph{p_value}}
 
 \item{p_value}{Numeric value.}
 }

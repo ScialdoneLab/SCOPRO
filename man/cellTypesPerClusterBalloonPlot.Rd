@@ -12,15 +12,15 @@ cellTypesPerClusterBalloonPlot(
   title_name,
   text_size = 0.4,
   label_size = 0.4,
-  thresold = 0.5
+  threshold = 0.5
 )
 }
 \arguments{
 \item{obj}{Seurat object given as output from function \emph{findCellTypesSeurat}}
 
-\item{cluster_vivo_factor}{Factor vector specifyng the cluster partition of the in vivo datataset}
+\item{cluster_vivo_factor}{Factor vector specifying the cluster partition of the in vivo datataset}
 
-\item{order_label_vivo}{Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}}
+\item{order_label_vivo}{Character vector specifying the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}}
 
 \item{method}{Character name. Must be one of Seurat, scibetR or scmap}
 
@@ -28,15 +28,15 @@ cellTypesPerClusterBalloonPlot(
 
 \item{text_size}{Numeric value, specifying the size of the text in the plot.}
 
-\item{label_size}{Numeric value specifyng the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.}
+\item{label_size}{Numeric value specifying the label.size parameter in the function \emph{balloonplot} from package \emph{gplots}.}
 
-\item{thresold}{Numeric value. Cells with a predicted score below or equal to \emph{thresold} are labelled as unassigned. Only used when \emph{method} is Seurat}
+\item{threshold}{Numeric value. Cells with a predicted score below or equal to \emph{threshold} are labelled as unassigned. Only used when \emph{method} is Seurat}
 }
 \value{
 balloon plot given by function \emph{balloonplot} from package \emph{gplots}
 }
 \description{
-All the stages in \emph{cluster_vivo_factor} are showns in the balloon plot
+All the stages in \emph{cluster_vivo_factor} are shown the balloon plot
 }
 \seealso{
 \url{https://CRAN.R-project.org/package=gplots}

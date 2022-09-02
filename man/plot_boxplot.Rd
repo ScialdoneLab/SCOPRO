@@ -22,7 +22,7 @@ plot_boxplot(
 
 \item{cluster_vivo}{cluster partition}
 
-\item{order_label_vivo}{Character vector specifyng the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}}
+\item{order_label_vivo}{Character vector specifying the order of the columns in the balloon plot. The names must be present in \emph{cluster_vivo_factor}}
 
 \item{title_name}{Character value.}
 
@@ -36,7 +36,7 @@ plot_boxplot(
 ggplot2 object.
 }
 \description{
-Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are showns in the balloon plot
+Only the stages in \emph{cluster_vivo_factor} with an assignment greater than zero are shown the balloon plot
 }
 \seealso{
 \url{https://CRAN.R-project.org/package=gplots}

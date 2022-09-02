@@ -10,7 +10,7 @@ plot_umap(coordinate_umap, cluster)
 \item{coordinate_umap}{Data frame with dimensionality reduction coordinates.
 Number of rows must be equal to the number of cells}
 
-\item{cluster}{Vector with cluster assignment. The length must be qual to the number of cells}
+\item{cluster}{Vector with cluster assignment. The length must be equal to the number of cells}
 }
 \value{
 ggplot2 object.

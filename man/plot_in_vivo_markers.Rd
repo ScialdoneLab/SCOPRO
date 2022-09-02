@@ -33,7 +33,7 @@ plot_in_vivo_markers(
 ggplot2::ggplot2 object.
 }
 \description{
-Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are epxressed above \emph{threshold}
+Cells are coloured according to the number of markers of the in vivo stage \emph{name_vivo} that are expressed above \emph{threshold}
 }
 \author{
 Gabriele Lubatti \email{gabriele.lubatti@helmholtz-muenchen.de}
