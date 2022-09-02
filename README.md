@@ -42,7 +42,7 @@ requires as input:
 9. **threshold** Numeric value. For a given gene, the jaccard index between the links from the in vivo and in vitro datasets is computed. If the jaccard index is above **threshold**, then the gene is considered to be conserved between the two datasets.
 10. **number_link** Numeric value. For a given gene in the in vivo dataset with links above **number_link**, the jaccard index between the links from in vitro and in vivo dataset is computed.
 11. **threshold_fold_change** Numeric value. Above **threshold** the fold change between genes is computed. Below **threshold** the difference between genes is computed.
-12. **fold_change** Numeric value. For a given gene, the fold change between all the other genes is computed. If fold change is above \emph{fold_change}, then there is a link with weight 1 between the two genes.
+12. **fold_change** Numeric value. For a given gene, the fold change between all the other genes is computed. If fold change is above **fold_change**, then there is a link with weight 1 between the two genes.
 13. **marker_stages** Second element of the list given as output by the function **select_top_markers**
 14. **selected_stages** In vivo stages for which the markers are computed with the function **select_top_markers**
 
