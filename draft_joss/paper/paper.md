@@ -26,14 +26,14 @@ In the last decade the size of datasets generated with single cell RNA sequencin
 Efficient tools are essential in order to characterize a cell c from a newly generated dataset in quick and robust way, by projecting the new (query) dataset into an existing reference dataset. 
 Several tools were developed in the last years to address this task [@SCMAP2018; @SCIBET2020; @SEURAT2019]. However, while they perform well if the similar cell types are present in both reference and query, they tend to fail if a cell type is only in the query but not in the reference. The main reason is that these methods predict always a label for the query cell, even if it is from cell type not included in the reference.
 Moreover the features (genes) that are in common between the reference cluster and the query cell that lead to the labelling are not given as output. 
-Here we propose SCOPRO, an R library that assigns an absolute score (from 0 to 1) between each cluster in the query dataset and a given cluster in the reference dataset.  The score is given by the fraction of genes that are conserved between the query and the reference cluster.
+Here we propose SCOPRO (SCOre PROjection), an R library that assigns an absolute score (from 0 to 1) between each cluster in the query dataset and a given cluster in the reference dataset.  The score is given by the fraction of genes that are conserved between the query and the reference cluster.
 Since is bounded between 0 and 1, the score is comparable across clusters and does not depend on the clusters included in the reference dataset. 
 
 
 
 # Statement of need
 As more and more new datasets are generated with single cell RNA sequencing technique, it has become crucial to compare the new datasets with already existing and annotated references. In the last years, several tools were developed to perform label transfer from a reference to a query dataset. 
-Among the most popular ones there are Seurat, SciBet and scmap [@SEURAT2019; @SCIBET2020; @SCMAP2018;]. They are all implemented in an R package.
+Among the most popular ones there are Seurat, SciBet and scmap [@SEURAT2019; @SCIBET2020; @SCMAP2018]. They are all implemented in an R package.
 Seurat[@SEURAT2019] is based on the idea of using anchors between query and reference.  Anchor is a cells pair (one from query, one from reference) made up of mtual nearest neighbors[@MNN2018] found in a shared low dimensional embedding. 
 Once the anchors are identified, the annotation of each cell in the query set is achieved using a weighted vote classifier based on the reference cell identities. So for each query cell a quantitative score for every cluster in the reference dataset is given.
 In SciBet[@SCIBET2020], first a features selection process is done for each cell types in the reference with E-test. Then a multinomial model is built (one for each cell type in the reference). The parameters of the distribution are computed starting from the normalized expression of the selected features. The query cell is annotated with the cell type in the reference that maximized the likelihood function.
@@ -42,18 +42,21 @@ The Similarities between the query cell and the closest reference cluster are co
 Seurat and scmap assign a quantitative score to each of the query cell. However this quantitative score depends on the clusters included in the reference dataset.  On the contrary SciBet returns as output only the predicted label of the query cell, but not a quantitative score. 
 For all the three methods the labelling show simply to which cluster in the reference the query cell is closer to, but not how much the query cell is similar to the reference.
 Another limitation of the previous methods is that the common genes that drive the labelling of the query cell are not given as output.
-To overcome these limitations, we develop SCOPRO, an R package that assigns a score projection from 0 to 1 between a given cluster in the reference and each single cluster from a query dataset. The score is assigned based on the fraction of specific markers of the reference cluster that are conserved in the query cluster.
+To overcome these limitations, we develop SCOPRO (SCOre PROjection), an R package that assigns a score projection from 0 to 1 between a given cluster in the reference and each single cluster from a query dataset. The score is assigned based on the fraction of specific markers of the reference cluster that are conserved in the query cluster.
 The first step is to select as features only the markers of the reference clusters with a median above a given threshold in one cluster and below this threshold in all the other clusters.
 For a given cluster, a connectivity matrix is computed with number of rows and number of columns equal to the number of the selected markers. Each entry (i,j) in the matrix can be 1 if the fold change between gene i and gene j is above a given fold change. Otherwise is 0. Finally the connectivity matrix of the reference cluster and all the clusters in the query dataset are compared. A gene i is considered to be conserved between a reference cluster and a query cluster if the jaccard index of the links of gene i is above a given threshold.
 SCOPRO returns as output a score between 0 and 1 that rely only on the fraction of conserved genes between the reference and the query clusters, but not on which clusters are included in the reference. For this reason, the score from SCOPRO can be interpreted as an attempt to provide an absolute measure of similarity between query and reference clusters, differently from the output of the previous methods.
-In addition SCOPRO provides as output the genes that are conserved between query and reference dataset. These genes are relevant because they are responsible or the final score.
+In addition SCOPRO provides as output the genes that are conserved between query and reference dataset. These genes are relevant because they are responsible for the final score.
 
 
 # Key functions
 
 The two main functions of SCOPRO are:
+
 1. 'SCOPRO': It takes as input the normalized count matrix of the query and reference datasets, the unsupervised cluster assignment for the query, the selected reference cluster for which we want to compute the score and the features (markers genes) from the reference. The output returns by SCOPRO is a list including the score and the conserved genes between each query cluster and the given reference 
+
 2. 'cluster.plot_score': It takes as input the output of SCOPRO and it returns the score between each query clusters and the reference.
+
 3. 'plot_score_genes': it returns a balloon plot with the conserved and not conserved genes between a given reference cluster and the query clusters. 
 
 In SCOPRO package are also implemented wrapper functions for popular R based projection tools (Seurat, SciBet and scmap). These wrapper functions are built in order that their output is perfectly integrable with other SCOPRO functions   This has the advantage of having in one, easy to use library several methods that can be used for a comparison with the output of SCOPRO. 
