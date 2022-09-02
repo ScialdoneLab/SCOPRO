@@ -142,7 +142,7 @@ plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages,
 
 ### Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
 
- We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluter 2.
+ We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluster 2.
 As expected the Zscan4 family genes are conserved.
 ```r
 common_genes <- select_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
