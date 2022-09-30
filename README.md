@@ -137,7 +137,7 @@ analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_
 
 plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
 ```
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_1.png" width="500" height="500">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2.png" width="500" height="500">
 
 
 ### Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
@@ -160,7 +160,7 @@ mouse_plot
 
 
 ```
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_2.png" width="500" height="500">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2_marker.png" width="500" height="500">
 
 ## Comparison with projection based on Seurat
 
@@ -188,7 +188,7 @@ If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign 
 On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
 
 
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_no_late2.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_4_5.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/scopro_no_late2_epi_5_5.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_no_late2.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/epiblast_4_5_nolate.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/epiblast_5_5_nolate.png" width="300" height="300">
 
 ## Vignette
 
