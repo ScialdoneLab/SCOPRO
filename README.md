@@ -145,6 +145,8 @@ We run SCOPRO between the cluster of the mouse ESCs dataset and the in vivo stag
 The function SCOPRO first computes the mean expression profile of **marker_stages_filter** genes for each cluster in the in vivo and in vitro dataset.
 For a given cluster, a connectivity matrix is computed with number of rows and number of columns equal to the length of **marker_stages_filter**. Each entry (i,j)  in the matrix can be 1 if the fold_change between gene i and gene j is above **fold_change**. Otherwise is 0.
 Finally the connectivity matrix of Late 2-cells stage and all the clusters in the in vitro dataset are compared.
+The final score is computed as the fraction of conserved links between the network from the in vivo stage and each network from the in vitro dataset.
+The black line shown the fraction of conserved links that would be expected in a random scenario (where the same amount of links in the network are randomly assigned)
 A gene i is considered to be conserved between Late 2-cells stage and an in vitro cluster if the jaccard index of the links of gene i is above **threshold**.
 
 There are 25 markers of the Late 2-cells stage that are also expressed in the mouse ESC datasets.
