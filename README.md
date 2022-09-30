@@ -33,8 +33,6 @@ requires as input:
 
 1. **norm_vitro**: norm count matrix (n_genes X n_cells) for in vitro dataset
 2. **norm_vitro**: norm count matrix (n_genes X n_cells) for in vivo dataset
-3. **norm_vitro** Norm count matrix (n_genes X n_cells) for in vitro dataset
-4. **norm_vivo** Norm count matrix (n_genes X n_cells) for in vivo dataset
 5. **cluster_vitro** cluster for in vitro dataset
 6. **cluster_vivo**  cluster for in vivo dataset
 7. **name_vivo**  name of the in vivo stage on which SCOPRO is run
@@ -117,6 +115,29 @@ marker_all <- marker_result[[1]]
 marker_stages <- marker_result[[2]]
 ```
 
+Also the clusters from the in vitro dataset we select the markers following the same procedure used for the in vivo dataset.
+```r
+markers_first_ESC_small_vitro <- markers_cluster_seurat(mayra_seurat_0, cluster_es_vitro, names(mayra_seurat_0$RNA_snn_res.0.1),10)
+ 
+markers_mouse <- as.vector(markers_first_ESC_small_vitro[[3]])
+stages_markers <- names(markers_first_ESC_small_vitro[[3]])
+stages_markers <- stages_markers[markers_mouse%in%row.names(norm_vivo)]
+
+markers_small_vitro <- markers_mouse[markers_mouse%in%row.names(norm_vivo)]
+names(markers_small_vitro) <- stages_markers
+
+selected_stages_vitro <- names(table(cluster_es_vitro))
+
+marker_result <- select_top_markers(selected_stages_vitro, cluster_es_vitro, norm_es_vitro, markers_small_vitro,max_number = 100)
+marker_all_vitro <- marker_result[[1]]
+```
+We combine in vivo and in vitro markers
+```r
+marker_all <- c(marker_all,marker_all_vitro)
+marker_all <- unique(marker_all)
+```
+
+
 ### Run SCOPRO
 
 We run SCOPRO between the cluster of the mouse ESCs dataset and the in vivo stage "Late 2-cells".
@@ -127,15 +148,18 @@ Finally the connectivity matrix of Late 2-cells stage and all the clusters in th
 A gene i is considered to be conserved between Late 2-cells stage and an in vitro cluster if the jaccard index of the links of gene i is above **threshold**.
 
 There are 25 markers of the Late 2-cells stage that are also expressed in the mouse ESC datasets.
-More than 75% of these 25 markers are conserved in the cluster number 2.
+More than 50% of links in the Late 2-cells stage network are also conserved in the network of cluster 2.
 This result is expected since cluster 2 is made up by 2CLC, a rare population of cells known to be transcriptionally similar to the late 2 cells-stage in the mouse embryo development (typical markers of 2CLC are the Zscan4 genes, also highly expressed in the late 2 cells-stage).
 
 ```r
-marker_stages_filter <- filter_in_vitro(norm_es_vitro,cluster_es_vitro ,marker_all, fraction = 0.10, threshold = 0)
+marker_stages_filter <- filter_in_vitro(norm_es_vitro, cluster_es_vitro, marker_all, fraction = 0.10, threshold = 0)
 
-analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo,cluster_es_vitro,cluster_mouse_published,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, selected_stages)
+analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo_small,cluster_es_vitro,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, selected_stages)
 
-plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell")
+analysis_2cell_random <- SCOPRO_random(norm_es_vitro, norm_vivo_small, cluster_es_vitro, cluster_mouse_published_small,"Late_2_cell", marker_stages_filter, 3, threshold_fold_change = 0.1, selected_stages, 100)
+
+
+plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell", random = TRUE, analysis_2cell_random)
 ```
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2.png" width="500" height="500">
 
@@ -155,7 +179,7 @@ all_genes <- c(no_common_genes[1:4], common_genes[1:10])
 all_genes_label <- c(paste0(no_common_genes[1:4], "-no_conserved"), paste0(common_genes[1:10], "-conserved"))
 
 
-mouse_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vitro", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
+mouse_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vivo", norm_es_vitro,norm_vivo[ , cluster_mouse_published=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published[cluster_mouse_published == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
 mouse_plot
 
 
@@ -185,7 +209,7 @@ order_label_vivo <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_yes_late2.png" width="300" height="300">    <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2.png" width="300" height="300">
 
 If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign cluster 2 to epiblast 4.5 and epiblast 5.5, although this cluster shares just a few markers with these in vivo stages.
-On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
+On the other hand SCOPRO assigns a low score (below 0.3) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
 
 
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_no_late2.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/epiblast_4_5_nolate.png" width="300" height="300">      <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/epiblast_5_5_nolate.png" width="300" height="300">
