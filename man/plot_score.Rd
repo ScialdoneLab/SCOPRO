@@ -12,7 +12,9 @@ plot_score(
   name_vivo,
   y_name,
   fill_name,
-  title_name
+  title_name,
+  random = FALSE,
+  SCOPRO_output_random = NULL
 )
 }
 \arguments{
@@ -31,6 +33,10 @@ plot_score(
 \item{fill_name}{Character value.}
 
 \item{title_name}{Character value.}
+
+\item{random}{Logical. If TRUE the distribution of final scores given by \emph{SCOPRO_random} is shown.}
+
+\item{SCOPRO_output_random}{Output given by the function \emph{SCOPRO_random}.}
 }
 \value{
 ggplot2::ggplot2 object.

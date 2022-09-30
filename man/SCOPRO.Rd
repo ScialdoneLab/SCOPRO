@@ -47,11 +47,13 @@ SCOPRO(
 \value{
 A list with five elements:
 
-\item{common_link}{Vector with the names of the genes conserved between \emph{name_vivo} and all the clusters in the vitro dataset}
-\item{no_common_link}{Vector with the names of the genes not conserved between \emph{name_vivo} and  the clusters in the vitro dataset}
-\item{link_kept}{List with the names of the genes conserved between \emph{name_vivo} and each single cluster in the vitro dataset}
-\item{link_no_kept}{List with the names of the genes not conserved between \emph{name_vivo} and each single cluster in the vitro dataset}
-\item{final_score}{Numeric value, given by the fraction of conserved markers of \emph{name_vivo} and each single cluster in the in vitro dataset}
+\item{common_genes}{Vector with the names of the genes conserved between \emph{name_vivo} and all the clusters in the vitro dataset}
+\item{no_common_genes}{Vector with the names of the genes not conserved between \emph{name_vivo} and  the clusters in the vitro dataset}
+\item{genes_kept}{List with the names of the genes conserved between \emph{name_vivo} and each single cluster in the vitro dataset}
+\item{genes_no_kept}{List with the names of the genes not conserved between \emph{name_vivo} and each single cluster in the vitro dataset}
+\item{fraction_conserved_markers}{Numeric value, given by the fraction of conserved markers of \emph{name_vivo} and each single cluster in the in vitro dataset}
+\item{final_score}{fraction of conserved links between the \emph{name_vivo} network and the network
+from each cluster in the in vitro dataset}
 }
 \description{
 The mean expression profile of \emph{marker_stages_filter} genes is computed for each cluster in the in vivo and in vitro dataset.
