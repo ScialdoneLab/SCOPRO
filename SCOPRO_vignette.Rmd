@@ -1,0 +1,292 @@
+---
+title: "SCOPRO"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{SCOPRO}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+  % \VignetteDepends{Seurat,gplots,plyr}
+---
+
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width=7, 
+  fig.height=5
+)
+```
+
+The vignette depends on Seurat, gplots and plyr packages.
+```{r, eval = FALSE}
+required <- c("Seurat","gplots","plyr")
+if (sum(!all(unlist(lapply(required, function(pkg) requireNamespace(pkg, quietly = TRUE)))))>0)
+  knitr::opts_chunk$set(eval = FALSE)
+```
+
+```{r}
+library(SCOPRO)
+```
+
+
+In this vignette it is shown the projection performed between single cell RNA seq mouse data from [Iturbe et al., 2021](https://www.nature.com/articles/s41594-021-00590-w) and in vivo mouse datasets from [Deng et al. , 2014](https://pubmed.ncbi.nlm.nih.gov/24408435/) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610). 
+
+The single cell RNA seq dataset includes 1285 mouse embryonic stem cells, including a small cluster of 2-cell-like cells (2CLC) (cluster 2, 31 cells).  
+
+The in vivo mouse dataset from [Deng et al. , 2014](https://pubmed.ncbi.nlm.nih.gov/24408435/) includes stages from from early 2 cells-stage to late blastocyst while the in vivo mouse dataset from [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) includes stages from from E4.5 to E6.5.
+
+## Load mouse ESCs raw count matrix
+We load the raw count matrix provided in the original paper and create norm counts and run cluster analysis with CIARA function **cluster_analysis_integrate_rare ** 
+
+Raw count matrix can be downloaded [here](https://hmgubox2.helmholtz-muenchen.de/index.php/s/EHQSnjMJxkR7QYT)
+
+
+```{r, eval = FALSE }
+current_wd <- getwd()
+url = "https://hmgubox2.helmholtz-muenchen.de/index.php/s/EHQSnjMJxkR7QYT/download/SCOPRO.zip"
+destfile <- paste0(current_wd,"/SCOPRO.zip")
+download.file(url, destfile, quiet = FALSE)
+unzip(destfile, exdir=current_wd)
+```
+
+```{r, eval = FALSE }
+setwd(paste0(current_wd,"/SCOPRO"))
+load(file='mayra_dati_raw_0.Rda')
+mayra_seurat_0 <- create_seurat_object(mayra_dati_raw_0,"Mayra_data_0",0.1,5,30)
+
+norm_es_vitro <- as.matrix(Seurat::GetAssayData(mayra_seurat_0, slot = "data",assay="RNA"))
+cluster_es_vitro <- as.vector(mayra_seurat_0$RNA_snn_res.0.1)
+cordinate_umap_es <- as.data.frame(Seurat::Embeddings(mayra_seurat_0, reduction = "umap")[, 1:2])
+```
+
+
+
+
+## Load in vivo mouse datasets
+
+The seurat object **seurat_genes_published_mouse.Rda** already includes the raw and normalized count matrix obtained combining the two in vivo datasets ( [Deng et al., 014](https://pubmed.ncbi.nlm.nih.gov/24408435/) and [Mohammed et al. , 2017](https://www.sciencedirect.com/science/article/pii/S2211124717309610) ).
+Normalization was done with Seurat function **NormalizeData** (default parameters).
+Seurat object can be downloaded [here](https://hmgubox2.helmholtz-muenchen.de/index.php/s/EHQSnjMJxkR7QYT)
+
+```{r , eval = FALSE}
+setwd(paste0(current_wd,"/SCOPRO"))
+load(file="seurat_genes_published_mouse.Rda")
+
+norm_vivo <- as.matrix(Seurat::GetAssayData(seurat_genes_published_mouse, slot = "data",assay="RNA"))
+
+```
+
+
+
+
+## Compute markers for selected in vivo stages 
+
+
+```{r, eval = FALSE}
+Seurat::DefaultAssay(seurat_genes_published_mouse) <- "RNA"
+cluster_mouse_published <- as.vector(seurat_genes_published_mouse$stim)
+
+
+selected_stages <- c("Late_2_cell","epiblast_4.5","epiblast_5.5","epiblast_6.5")
+
+
+cluster_mouse_published_small <- cluster_mouse_published[cluster_mouse_published %in% selected_stages]
+
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+
+seurat_genes_published_mouse_small <- seurat_genes_published_mouse[, cluster_mouse_published %in% selected_stages]
+
+norm_vivo_small <- as.matrix(Seurat::GetAssayData(seurat_genes_published_mouse_small, slot = "data",assay="RNA"))
+
+markers_first_ESC_small <- markers_cluster_seurat(seurat_genes_published_mouse_small,cluster_mouse_published_small,names(seurat_genes_published_mouse_small$RNA_snn_res.0.2),10)
+
+```
+
+
+
+
+```{r,eval = FALSE }
+
+
+markers_mouse <- as.vector(markers_first_ESC_small[[3]])
+stages_markers <- names(markers_first_ESC_small[[3]])
+
+## Keeping only the genes in common between in vitro and in vivo datasets
+stages_markers <- stages_markers[markers_mouse %in% row.names(norm_es_vitro)]
+
+markers_small <- markers_mouse[markers_mouse %in% row.names(norm_es_vitro)]
+names(markers_small) <- stages_markers
+```
+
+
+## Select only black/white markers for in vivo stages
+
+For each in vivo stage, we select only the markers for which the median is above 0.1 and is below 0.1 in all the other stages.
+```{r ,eval = FALSE}
+
+
+marker_result <- select_top_markers(selected_stages, cluster_mouse_published_small, norm_vivo_small, markers_small, max_number = 100, threshold = 0.1)
+marker_all <- marker_result[[1]]
+marker_stages <- marker_result[[2]]
+
+
+
+```
+
+
+```{r ,eval = FALSE}
+heatmap_markers_vivo(norm_vivo_small, marker_stages, selected_stages, max_number =10, cluster_mouse_published_small, median_profile = TRUE, color_vector = NULL)
+```
+
+
+## Select black/white markers for clusters in vitro
+
+```{r, eval = FALSE}
+
+markers_first_ESC_small_vitro <- markers_cluster_seurat(mayra_seurat_0, cluster_es_vitro, names(mayra_seurat_0$RNA_snn_res.0.1),10)
+ 
+markers_mouse <- as.vector(markers_first_ESC_small_vitro[[3]])
+stages_markers <- names(markers_first_ESC_small_vitro[[3]])
+stages_markers <- stages_markers[markers_mouse%in%row.names(norm_vivo)]
+
+markers_small_vitro <- markers_mouse[markers_mouse%in%row.names(norm_vivo)]
+names(markers_small_vitro) <- stages_markers
+
+selected_stages_vitro <- names(table(cluster_es_vitro))
+
+marker_result <- select_top_markers(selected_stages_vitro, cluster_es_vitro, norm_es_vitro, markers_small_vitro,max_number = 100)
+marker_all_vitro <- marker_result[[1]]
+
+
+```
+
+## Combine in vivo and in vitro markers
+```{r, eval = FALSE }
+
+marker_all <- c(marker_all,marker_all_vitro)
+marker_all <- unique(marker_all)
+
+
+```
+
+
+## Run SCOPRO
+
+We run SCOPRO between the cluster of the mouse ESCs dataset and the in vivo stage "Late 2-cells".
+
+The function SCOPRO first computes the mean expression profile of **marker_stages_filter** genes for each cluster in the in vivo and in vitro dataset.
+For a given cluster, a connectivity matrix is computed with number of rows and number of columns equal to the length of **marker_stages_filter**. Each entry (i,j)  in the matrix can be 1 if the fold_change between gene i and gene j is above **fold_change**. Otherwise is 0.
+Finally the connectivity matrix of Late 2-cells stage and all the clusters in the in vitro dataset are compared.
+The final score is computed as the fraction of conserved links between the network from the in vivo stage and each network from the in vitro dataset.
+The black line shown the fraction of conserved links that would be expected in a random scenario (where the same amount of links in the network are randomly assigned)
+A gene i is considered to be conserved between Late 2-cells stage and an in vitro cluster if the jaccard index of the links of gene i is above **threshold**.
+
+
+There are 25 markers of the Late 2-cells stage that are also expressed in the mouse ESC datasets.
+More than 50% of links in the Late 2-cells stage network are also conserved in the network of cluster 2.
+This result is expected since cluster 2 is made up by 2CLC, a rare population of cells known to be transcriptionally similar to the late 2 cells-stage in the mouse embryo development (typical markers of 2CLC are the Zscan4 genes, also highly expressed in the late 2 cells-stage).
+
+
+
+```{r ,eval = FALSE}
+
+marker_stages_filter <- filter_in_vitro(norm_es_vitro, cluster_es_vitro, marker_all, fraction = 0.10, threshold = 0)
+
+analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo_small,cluster_es_vitro,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, selected_stages)
+
+analysis_2cell_random <- SCOPRO_random(norm_es_vitro, norm_vivo_small, cluster_es_vitro, cluster_mouse_published_small,"Late_2_cell", marker_stages_filter, 3, threshold_fold_change = 0.1, selected_stages, 100)
+
+
+plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell", random = TRUE, analysis_2cell_random)
+
+
+```
+
+
+
+
+It is possible to see in which cells the late 2 cells markers are expressed at a level greater than 0 with the function **plot_in_vivo_markers**. Each cell is coloured according to the numbers of expressed 2 cells markers.
+As expected the cells that express an high number of these markers are from cluster 2
+```{r, eval = FALSE}
+plot_in_vivo_markers(cordinate_umap_es, norm_es_vitro, marker_stages, selected_stages, "Late_2_cell", 0, "Late 2 cells markers")
+```
+
+```{r, eval = FALSE}
+plot_umap(cordinate_umap_es, cluster_es_vitro)
+```
+
+
+
+
+## Visualization of conserved/ not conserved genes between late 2 cells stage and in vitro clusters
+
+We can visualize which are the markers of the late 2 cells stage that are conserved/ not conserved in cluster 2.
+As expected the Zscan4 family genes are conserved.
+```{r,eval = FALSE}
+
+
+common_genes <- select_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
+no_common_genes <- select_no_common_genes(analysis_2cell, marker_stages, selected_stages, "Late_2_cell", cluster_es_vitro, "2")
+
+
+
+
+all_genes <- c(no_common_genes[1:4], common_genes[1:10])
+all_genes_label <- c(paste0(no_common_genes[1:4], "-no_conserved"), paste0(common_genes[1:10], "-conserved"))
+
+
+
+
+
+mouse_plot <- plot_score_genes(all_genes, "Mouse ESC", "Mouse vivo", norm_es_vitro,norm_vivo_small[ , cluster_mouse_published_small=="Late_2_cell"],cluster_es_vitro, cluster_mouse_published_small[cluster_mouse_published_small == "Late_2_cell"], all_genes_label, 7, 10, "Late_2_cell")
+
+mouse_plot
+
+
+
+
+
+```
+
+
+```{r,eval = FALSE}
+```
+
+
+
+
+## Projection with Seurat
+
+Commonly used methods for projection (Seurat) generally give as output a relative score normalized to one or just the predicted label (scibetR, scmap). This is the case for the projection based on seurat functions FindTransferAnchors and TransferData. Seurat projection is implemented in the function **findCellTypesSeurat**.
+The implementation of [scibetR](https://github.com/zwj-tina/scibetR) and [scmap](https://bioconductor.org/packages/release/bioc/html/scmap.html) is also available in SCOPRO with the functions **findCellTypes_scmap** and **findCellTypesScibet**
+
+
+```{r,eval = FALSE}
+
+cluster_mouse_rename_small <- plyr::revalue(cluster_mouse_published_small, c("Late_2_cell"="Late_2cell","epiblast_4.5"="epi_4.5","epiblast_5.5"="epi_5.5","epiblast_6.5"="epi_6.5"))
+
+```
+
+```{r,eval = FALSE}
+
+mayra_seurat_0 <- findCellTypesSeurat(queryObj = mayra_seurat_0, referenceObj = seurat_genes_published_mouse_small, k.anchor =5, k.filter = 200, namedLabels = cluster_mouse_rename_small, k.weight = 20)
+
+
+ 
+ 
+
+ cluster_vivo_factor <- factor(cluster_mouse_rename_small,levels=c("Late_2cell","epi_4.5","epi_5.5","epi_6.5"))
+
+order_label_vivo <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
+
+ 
+cellTypesPerClusterBalloonPlot(obj = mayra_seurat_0, cluster_vivo_factor, order_label_vivo,  title_name  = "Projection Mouse ESC on mouse embryos ", method = "Seurat" ,1,1,0.1)
+ 
+```
+
+
+```{r}
+utils::sessionInfo()
+```
