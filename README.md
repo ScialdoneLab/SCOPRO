@@ -182,7 +182,7 @@ order_label_vivo <- c("Late_2cell","epi_4.5","epi_5.5","epi_6.5")
  
 ```
 
-<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_yes_late2.png" width="300" height="300">    <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/SCOPRO_1.png" width="300" height="300">
+<img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/seurat_yes_late2.png" width="300" height="300">    <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2.png" width="300" height="300">
 
 If only epiblast stages from 4.5 to 6.5 are used, then Seurat will still assign cluster 2 to epiblast 4.5 and epiblast 5.5, although this cluster shares just a few markers with these in vivo stages.
 On the other hand SCOPRO assigns a low score (below 0.5) in cluster 2 for both epiblast 4.5 and epiblast 5.5. 
