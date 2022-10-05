@@ -56,8 +56,8 @@ plot_score_genes <- function(markers_to_plot ,label_1, label_2, norm_vitro,norm_
 #' @inheritParams plot_score_genes
 #' @param y_name Character value
 #' @param fill_name Character value.
-#' @param random Logical. If TRUE the distribution of final scores given by \emph{SCOPRO_random} is shown.
-#' @param SCOPRO_output_random Output given by the function \emph{SCOPRO_random}.
+#' @param theoretical_expectation Logical. If TRUE the theoretical_expectation of the final scores given is shown under the assumption of
+#' a binomial distribution.
 
 #' @return ggplot2::ggplot2 object.
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
@@ -69,40 +69,26 @@ plot_score_genes <- function(markers_to_plot ,label_1, label_2, norm_vitro,norm_
 
 
 plot_score <- function (SCOPRO_output, marker_stages, marker_stages_filter,
-                             selected_stages, name_vivo, y_name, fill_name, title_name, random = FALSE, SCOPRO_output_random = NULL)
+          selected_stages, name_vivo, y_name, fill_name, title_name,
+          theoretical_expectation = FALSE)
 {
-  if (isTRUE(random)){
-    if (is.null(SCOPRO_output_random)){
-      stop(paste0("parameter SCOPRO_output_random can not be NULL when random = TRUE."))
-    }
-    median <- rep(list(0),length(SCOPRO_output_random))
-    for(i in 1:length(median)){
-      median[[i]] <- median(SCOPRO_output_random[[i]])
-    }
-    median_all <- unlist(median)
-    bars <- rep(list(0), length(SCOPRO_output_random))
-    for(i in 1:length(median_all)){
-      bars[[i]] <- median(SCOPRO_output_random[[i]])-sd(SCOPRO_output_random[[i]])
-    }
-    bars_below_all <- unlist(bars)
-    bars <- rep(list(0), length(SCOPRO_output_random))
-    for(i in 1:length(median_all)){
-      bars[[i]] <- median(SCOPRO_output_random[[i]]) +sd (SCOPRO_output_random[[i]])
-    }
-    bars_high_all <- unlist(bars)
+  if (isTRUE(theoretical_expectation)) {
+    median_all <- unlist(SCOPRO_output[[8]])
     final_score <- c(as.vector(unlist(SCOPRO_output[[6]])))
     label <- c(names(unlist(SCOPRO_output[[6]])))
     df <- data.frame(final_score, label)
     index_specific <- which(selected_stages %in% name_vivo)
     marker_specific <- marker_stages[[index_specific]]
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = label, y = final_score, fill = label)) + ggplot2::geom_bar(stat = "identity") +
+    p <- ggplot2::ggplot(df, ggplot2::aes(x = label, y = final_score,
+                                          fill = label)) + ggplot2::geom_bar(stat = "identity") +
       ggplot2::theme_minimal()
     p + ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45,
                                                            vjust = 1, hjust = 1), axis.title.x = ggplot2::element_blank()) +
       ggplot2::ylab(y_name) + ggplot2::labs(fill = fill_name) +
       ggplot2::ylim(c(0, 1)) + ggplot2::ggtitle(paste0(title_name,
                                                        " (", sum(marker_stages_filter %in% marker_specific),
-                                                       " markers expressed in vitro)", sep = " "))+ggplot2::geom_errorbar(ggplot2::aes(y = median_all, ymin = bars_below_all, ymax = bars_high_all,  col = "ref1"),col = "black", linetype = 1)
+                                                       " markers expressed in vitro)", sep = " ")) + ggplot2::geom_errorbar(ggplot2::aes(y = median_all,ymin = median_all, ymax = median_all, col = "ref1"),
+                                                                                                                            col = "black", linetype = 1)
   }
   else {
     final_score <- c(as.vector(unlist(SCOPRO_output[[6]])))
@@ -121,7 +107,6 @@ plot_score <- function (SCOPRO_output, marker_stages, marker_stages_filter,
                                                        " markers expressed in vitro)", sep = " "))
   }
 }
-
 
 #' plot_score_sc
 #'

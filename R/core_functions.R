@@ -27,6 +27,9 @@
 #' \item{fraction_conserved_markers}{Numeric value, given by the fraction of conserved markers of \emph{name_vivo} and each single cluster in the in vitro dataset}
 #' \item{final_score}{fraction of conserved links between the \emph{name_vivo} network and the network
 #' from each cluster in the in vitro dataset}
+#' \item{pvalue_binom}{p value given by the function \emph{binom.test} and assigned to each cluster in the in vitro dataset}
+#' \item{theory_binom}{theoretical mean value of the final score computed from the binomial distribution under the assumption that
+#' the links are randomly assigned to the nodes in the network}
 #' @author Gabriele Lubatti \email{gabriele.lubatti@@helmholtz-muenchen.de}
 #' @examples
 #' load(system.file("extdata", "norm_es_vitro_small.Rda", package = "SCOPRO"))
@@ -58,13 +61,17 @@
 #' @importFrom utils download.file
 #' @importFrom utils unzip
 #' @importFrom stats sd
+#' @importFrom stats binom.test
+#' @importFrom stats dbinom
+#' @importFrom stats pbinom
+
 
 
 
 SCOPRO <- function (norm_vitro, norm_vivo, cluster_vitro, cluster_vivo,
-                      name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1,
-                      fold_change = 3, threshold_fold_change = 0.1, marker_stages,
-                      selected_stages)
+          name_vivo, marker_stages_filter, threshold = 0.1, number_link = 1,
+          fold_change = 3, threshold_fold_change = 0.1, marker_stages,
+          selected_stages)
 {
   if (sum(selected_stages %in% name_vivo) == 0) {
     stop("name_vivo must be one the stages present in the vector selected_stages")
@@ -87,6 +94,8 @@ SCOPRO <- function (norm_vitro, norm_vivo, cluster_vitro, cluster_vivo,
   genes_no_kept <- rep(list(0), length(name_cluster))
   fraction_conserved_markers <- rep(list(0), length(name_cluster))
   final_score <- rep(list(0), length(name_cluster))
+  pvalue_binom <- rep(list(0), length(name_cluster))
+  theory_binom <- rep(list(0), length(name_cluster))
   for (i in 1:length(name_cluster)) {
     mean_cluster <- mean_stage(norm_vitro, cluster_vitro,
                                name_cluster[i], marker_stages_filter)
@@ -114,10 +123,18 @@ SCOPRO <- function (norm_vitro, norm_vivo, cluster_vitro, cluster_vivo,
     names(genes_no_kept[[i]]) <- rep(name_cluster[i], length(genes_no_kept[[i]]))
     fraction_conserved_markers[[i]] <- result_comparison[[3]]
     names(fraction_conserved_markers[[i]]) <- name_cluster[i]
-
-
-    final_score[[i]] <- common_link_detection(connectivity_vivo, connectivity_vitro)
+    final_score[[i]] <- common_link_detection(connectivity_vivo,
+                                              connectivity_vitro)
     names(final_score[[i]]) <- name_cluster[i]
+
+    pvalue_binom_all <- SCOPRO_significance(connectivity_vivo, connectivity_vitro)
+    pvalue_binom[i] <- pvalue_binom_all[[1]]
+    theory_binom[[i]] <- pvalue_binom_all[[2]]
+    names(pvalue_binom[[i]]) <- name_cluster[i]
+    names(theory_binom[[i]]) <- name_cluster[i]
+
+
+
   }
   common_genes <- Reduce(intersect, genes_kept)
   if (length(common_genes) == 0) {
@@ -126,7 +143,7 @@ SCOPRO <- function (norm_vitro, norm_vivo, cluster_vitro, cluster_vivo,
   }
   no_common_genes <- Reduce(intersect, genes_no_kept)
   return(list(common_genes, no_common_genes, genes_kept, genes_no_kept,
-              fraction_conserved_markers, final_score))
+              fraction_conserved_markers, final_score, pvalue_binom, theory_binom))
 }
 
 
@@ -391,6 +408,31 @@ comparison_vivo_vitro <- function(connectivity_vivo, connectivity_vitro, thresho
 }
 
 
+#' SCOPRO_significance
+#' @noRd
+SCOPRO_significance <- function(connectivity_vivo, connectivity_vitro) {
+
+  connectivity_vivo_vector <- as.vector(connectivity_vivo)
+  final_connectivity_vitro <- as.vector(connectivity_vitro)
+  probability_vivo <- sum(connectivity_vivo_vector == 1)/length(connectivity_vivo_vector)
+  number_binomial <- length(connectivity_vivo_vector)
+
+  length_theory <- min(sum(connectivity_vivo_vector == 1),sum(final_connectivity_vitro == 1))
+
+  probability_vitro <- sum(final_connectivity_vitro == 1) / number_binomial
+  probability_combined <- probability_vivo * probability_vitro
+  length_conserved <- length(which(connectivity_vivo_vector == 1 & final_connectivity_vitro == 1 ))
+  result_binomial <- pbinom(length_conserved, number_binomial, probability_combined)
+  pvalue_binomial <- binom.test(length_conserved,number_binomial, probability_combined, alternative = c("greater"))$p.value
+  mean_value_theory <- rep(0,length_theory)
+  for (i in 1:number_binomial){
+    mean_value_theory[i] <- (dbinom(i,number_binomial, probability_combined)) * (i)/(length_theory)
+  }
+  mean_value_final <- sum(mean_value_theory)
+  return(list(pvalue_binomial, mean_value_final))
+}
+
+
 
 #' create_seurat_object
 #' @param raw_counts Raw count matrix (n_genes X n_cells).
@@ -442,22 +484,24 @@ create_seurat_object <- function (raw_counts, project_name, resolution, neighbor
   return(seurat_object)
 }
 
+
+
 #' significance_value
 #' @inheritParams plot_score
 #' @param threshold Numeric value.
-#' @description Detect the in vitro clusters for which the difference between the final score given by SCOPRO and the median value of the final scores given by the function SCOPRO_random
+#' @description Detect the in vitro clusters for which the final score given by SCOPRO is statistically significant
+#' (p_value equal or below than \emph{threshold}), under the assumption of a binomial distribution.
 #' is greater than \emph{threshold}.
 #'
 #'
 #' @export significance_value
-significance_value <- function(SCOPRO_output, SCOPRO_output_random, threshold = 0.10){
-  median <- rep(list(0),length(SCOPRO_output_random))
-  for(i in 1:length(median)){
-    median[[i]] <- median(SCOPRO_output_random[[i]])
-  }
-  median_all <- unlist(median)
-  fraction_explained <- (unlist(SCOPRO_output[[6]]) - median_all)/ unlist(SCOPRO_output[[6]])
-  significance_clusters <- names(fraction_explained)[fraction_explained > threshold]
+
+significance_value <- function (SCOPRO_output, threshold = 0.05)
+{
+
+  p_value <- unlist(SCOPRO_output[[7]])
+  significance_clusters <- names(p_value)[p_value <=
+                                            threshold]
   return(significance_clusters)
 }
 
