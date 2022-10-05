@@ -4,16 +4,15 @@
 \alias{significance_value}
 \title{significance_value}
 \usage{
-significance_value(SCOPRO_output, SCOPRO_output_random, threshold = 0.1)
+significance_value(SCOPRO_output, threshold = 0.05)
 }
 \arguments{
 \item{SCOPRO_output}{output given by function \emph{SCOPRO}}
 
-\item{SCOPRO_output_random}{Output given by the function \emph{SCOPRO_random}.}
-
 \item{threshold}{Numeric value.}
 }
 \description{
-Detect the in vitro clusters for which the difference between the final score given by SCOPRO and the median value of the final scores given by the function SCOPRO_random
+Detect the in vitro clusters for which the final score given by SCOPRO is statistically significant
+(p_value equal or below than \emph{threshold}), under the assumption of a binomial distribution.
 is greater than \emph{threshold}.
 }

@@ -54,6 +54,9 @@ A list with five elements:
 \item{fraction_conserved_markers}{Numeric value, given by the fraction of conserved markers of \emph{name_vivo} and each single cluster in the in vitro dataset}
 \item{final_score}{fraction of conserved links between the \emph{name_vivo} network and the network
 from each cluster in the in vitro dataset}
+\item{pvalue_binom}{p value given by the function \emph{binom.test} and assigned to each cluster in the in vitro dataset}
+\item{theory_binom}{theoretical mean value of the final score computed from the binomial distribution under the assumption that
+the links are randomly assigned to the nodes in the network}
 }
 \description{
 The mean expression profile of \emph{marker_stages_filter} genes is computed for each cluster in the in vivo and in vitro dataset.

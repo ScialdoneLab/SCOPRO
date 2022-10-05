@@ -13,8 +13,7 @@ plot_score(
   y_name,
   fill_name,
   title_name,
-  random = FALSE,
-  SCOPRO_output_random = NULL
+  theoretical_expectation = FALSE
 )
 }
 \arguments{
@@ -34,9 +33,8 @@ plot_score(
 
 \item{title_name}{Character value.}
 
-\item{random}{Logical. If TRUE the distribution of final scores given by \emph{SCOPRO_random} is shown.}
-
-\item{SCOPRO_output_random}{Output given by the function \emph{SCOPRO_random}.}
+\item{theoretical_expectation}{Logical. If TRUE the theoretical_expectation of the final scores given is shown under the assumption of
+a binomial distribution.}
 }
 \value{
 ggplot2::ggplot2 object.
