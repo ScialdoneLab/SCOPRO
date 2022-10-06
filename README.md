@@ -158,10 +158,8 @@ marker_stages_filter <- filter_in_vitro(norm_es_vitro, cluster_es_vitro, marker_
 
 analysis_2cell <- SCOPRO(norm_es_vitro,norm_vivo_small,cluster_es_vitro,cluster_mouse_published_small,"Late_2_cell",marker_stages_filter, threshold = 0.1, number_link = 1, fold_change = 3, threshold_fold_change = 0.1 ,marker_stages, selected_stages)
 
-analysis_2cell_random <- SCOPRO_random(norm_es_vitro, norm_vivo_small, cluster_es_vitro, cluster_mouse_published_small,"Late_2_cell", marker_stages_filter, 3, threshold_fold_change = 0.1, selected_stages, 100)
 
-
-plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell", random = TRUE, analysis_2cell_random)
+plot_score(analysis_2cell, marker_stages, marker_stages_filter, selected_stages, "Late_2_cell", "Final score", "Cluster", "Late_2_cell", theoretical_expectation  = TRUE)
 ```
 <img src="https://github.com/ScialdoneLab/SCOPRO/blob/master/figures/late2_new.png" width="500" height="500">
 
